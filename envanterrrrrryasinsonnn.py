@@ -66,10 +66,12 @@ for month_end in month_end_dates:
         numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
         df[numeric_columns] = df[numeric_columns].fillna(0)
         df['Kategori'] = df['Kategori'].str.strip()
-        df['GrupAdı'] = df['GrupAdı'].str.strip()
+        if 'Firma' not in df.columns:
+            raise KeyError("Prosedür sonucunda 'Firma' kolonu bulunamadı.")
+        df['Firma'] = df['Firma'].str.strip()
         df['Month'] = month_label
         
-        grouped_df = df.groupby(['Kategori', 'GrupAdı', 'Month']).agg({
+        grouped_df = df.groupby(['Kategori', 'Firma', 'Month']).agg({
             'KalanTutar': 'sum',
             'KarOranı': 'mean'  # KarOranı'nı ortalama olarak alıyoruz
         }).reset_index()
@@ -92,21 +94,23 @@ try:
     numeric_columns = siparis_df.select_dtypes(include=['float64', 'int64']).columns
     siparis_df[numeric_columns] = siparis_df[numeric_columns].fillna(0)
     siparis_df['Kategori'] = siparis_df['Kategori'].str.strip()
-    siparis_df['GrupAdı'] = siparis_df['GrupAdı'].str.strip()
+    if 'Firma' not in siparis_df.columns:
+        raise KeyError("Prosedür sonucunda 'Firma' kolonu bulunamadı.")
+    siparis_df['Firma'] = siparis_df['Firma'].str.strip()
     
     logging.debug(f"Prosedür sütunları (Sipariş, {current_year}): {siparis_df.columns.tolist()}")
     if not siparis_df.empty:
         logging.debug(f"Sipariş örnek veri ({current_year}): {siparis_df.head().to_dict()}")
     
-    alis_siparis_tutar = siparis_df.groupby(['Kategori', 'GrupAdı'])['AlışSiparişTutarı'].sum().reset_index() if 'AlışSiparişTutarı' in siparis_df.columns else pd.DataFrame(columns=['Kategori', 'GrupAdı', 'AlışSiparişTutarı'])
-    satis_siparis_tutar = siparis_df.groupby(['Kategori', 'GrupAdı'])['SatışSiparişTutarı'].sum().reset_index() if 'SatışSiparişTutarı' in siparis_df.columns else pd.DataFrame(columns=['Kategori', 'GrupAdı', 'SatışSiparişTutarı'])
-    kar_orani = siparis_df.groupby(['Kategori', 'GrupAdı'])['KarOranı'].mean().reset_index() if 'KarOranı' in siparis_df.columns else pd.DataFrame(columns=['Kategori', 'GrupAdı', 'KarOranı'])
+    alis_siparis_tutar = siparis_df.groupby(['Kategori', 'Firma'])['AlışSiparişTutarı'].sum().reset_index() if 'AlışSiparişTutarı' in siparis_df.columns else pd.DataFrame(columns=['Kategori', 'Firma', 'AlışSiparişTutarı'])
+    satis_siparis_tutar = siparis_df.groupby(['Kategori', 'Firma'])['SatışSiparişTutarı'].sum().reset_index() if 'SatışSiparişTutarı' in siparis_df.columns else pd.DataFrame(columns=['Kategori', 'Firma', 'SatışSiparişTutarı'])
+    kar_orani = siparis_df.groupby(['Kategori', 'Firma'])['KarOranı'].mean().reset_index() if 'KarOranı' in siparis_df.columns else pd.DataFrame(columns=['Kategori', 'Firma', 'KarOranı'])
     
 except Exception as e:
     logging.error(f"Sipariş verileri çekme hatası ({current_year}): {str(e)}")
-    alis_siparis_tutar = pd.DataFrame(columns=['Kategori', 'GrupAdı', 'AlışSiparişTutarı'])
-    satis_siparis_tutar = pd.DataFrame(columns=['Kategori', 'GrupAdı', 'SatışSiparişTutarı'])
-    kar_orani = pd.DataFrame(columns=['Kategori', 'GrupAdı', 'KarOranı'])
+    alis_siparis_tutar = pd.DataFrame(columns=['Kategori', 'Firma', 'AlışSiparişTutarı'])
+    satis_siparis_tutar = pd.DataFrame(columns=['Kategori', 'Firma', 'SatışSiparişTutarı'])
+    kar_orani = pd.DataFrame(columns=['Kategori', 'Firma', 'KarOranı'])
 
 # SatışTutarı (geçen yıl)
 try:
@@ -118,13 +122,15 @@ try:
     numeric_columns = satis_df_last_year.select_dtypes(include=['float64', 'int64']).columns
     satis_df_last_year[numeric_columns] = satis_df_last_year[numeric_columns].fillna(0)
     satis_df_last_year['Kategori'] = satis_df_last_year['Kategori'].str.strip()
-    satis_df_last_year['GrupAdı'] = satis_df_last_year['GrupAdı'].str.strip()
+    if 'Firma' not in satis_df_last_year.columns:
+        raise KeyError("Prosedür sonucunda 'Firma' kolonu bulunamadı.")
+    satis_df_last_year['Firma'] = satis_df_last_year['Firma'].str.strip()
     
-    satis_tutar_last_year = satis_df_last_year.groupby(['Kategori', 'GrupAdı'])['SatışTutarı'].sum().reset_index() if 'SatışTutarı' in satis_df_last_year.columns else pd.DataFrame(columns=['Kategori', 'GrupAdı', 'SatışTutarı'])
+    satis_tutar_last_year = satis_df_last_year.groupby(['Kategori', 'Firma'])['SatışTutarı'].sum().reset_index() if 'SatışTutarı' in satis_df_last_year.columns else pd.DataFrame(columns=['Kategori', 'Firma', 'SatışTutarı'])
     
 except Exception as e:
     logging.error(f"SatışTutarı verisi çekme hatası ({last_year}): {str(e)}")
-    satis_tutar_last_year = pd.DataFrame(columns=['Kategori', 'GrupAdı', 'SatışTutarı'])
+    satis_tutar_last_year = pd.DataFrame(columns=['Kategori', 'Firma', 'SatışTutarı'])
 
 # SatışTutarı (mevcut yıl)
 try:
@@ -136,21 +142,23 @@ try:
     numeric_columns = satis_df_current_year.select_dtypes(include=['float64', 'int64']).columns
     satis_df_current_year[numeric_columns] = satis_df_current_year[numeric_columns].fillna(0)
     satis_df_current_year['Kategori'] = satis_df_current_year['Kategori'].str.strip()
-    satis_df_current_year['GrupAdı'] = satis_df_current_year['GrupAdı'].str.strip()
+    if 'Firma' not in satis_df_current_year.columns:
+        raise KeyError("Prosedür sonucunda 'Firma' kolonu bulunamadı.")
+    satis_df_current_year['Firma'] = satis_df_current_year['Firma'].str.strip()
     
-    satis_tutar_current_year = satis_df_current_year.groupby(['Kategori', 'GrupAdı'])['SatışTutarı'].sum().reset_index() if 'SatışTutarı' in satis_df_current_year.columns else pd.DataFrame(columns=['Kategori', 'GrupAdı', 'SatışTutarı'])
+    satis_tutar_current_year = satis_df_current_year.groupby(['Kategori', 'Firma'])['SatışTutarı'].sum().reset_index() if 'SatışTutarı' in satis_df_current_year.columns else pd.DataFrame(columns=['Kategori', 'Firma', 'SatışTutarı'])
     
 except Exception as e:
     logging.error(f"SatışTutarı verisi çekme hatası ({current_year}): {str(e)}")
-    satis_tutar_current_year = pd.DataFrame(columns=['Kategori', 'GrupAdı', 'SatışTutarı'])
+    satis_tutar_current_year = pd.DataFrame(columns=['Kategori', 'Firma', 'SatışTutarı'])
 
 # Verileri birleştir ve pivot tablo oluştur
 if all_data:
     combined_df = pd.concat(all_data, ignore_index=True)
     
-    # Kategori ve GrupAdı için pivot tablo
+    # Kategori ve firma için pivot tablo
     pivot_df = combined_df.pivot_table(
-        index=['Kategori', 'GrupAdı'],
+        index=['Kategori', 'Firma'],
         columns='Month',
         values=['KalanTutar', 'KarOranı'],
         aggfunc={'KalanTutar': 'sum', 'KarOranı': 'mean'},
@@ -158,7 +166,7 @@ if all_data:
     ).reset_index()
     
     # Çok seviyeli sütun isimlerini düzleştir
-    pivot_df.columns = ['Kategori', 'GrupAdı'] + [
+    pivot_df.columns = ['Kategori', 'Firma'] + [
         f"{month} {val}" for val, month in pivot_df.columns[2:]
     ]
     
@@ -167,31 +175,31 @@ if all_data:
     
     # AlışSiparişTutarı
     if not alis_siparis_tutar.empty:
-        pivot_df = pivot_df.merge(alis_siparis_tutar, on=['Kategori', 'GrupAdı'], how='left')
+        pivot_df = pivot_df.merge(alis_siparis_tutar, on=['Kategori', 'Firma'], how='left')
         pivot_df['Alış Sipariş Tutarı'] = pivot_df['AlışSiparişTutarı'].fillna(0)
         pivot_df = pivot_df.drop(columns=['AlışSiparişTutarı'], errors='ignore')
     
     # SatışSiparişTutarı
     if not satis_siparis_tutar.empty:
-        pivot_df = pivot_df.merge(satis_siparis_tutar, on=['Kategori', 'GrupAdı'], how='left')
+        pivot_df = pivot_df.merge(satis_siparis_tutar, on=['Kategori', 'Firma'], how='left')
         pivot_df['Satış Sipariş Tutarı'] = pivot_df['SatışSiparişTutarı'].fillna(0)
         pivot_df = pivot_df.drop(columns=['SatışSiparişTutarı'], errors='ignore')
     
     # SatışTutarı (geçen yıl)
     if not satis_tutar_last_year.empty:
-        pivot_df = pivot_df.merge(satis_tutar_last_year, on=['Kategori', 'GrupAdı'], how='left')
+        pivot_df = pivot_df.merge(satis_tutar_last_year, on=['Kategori', 'Firma'], how='left')
         pivot_df[f'Satış Tutarı ({last_year})'] = pivot_df['SatışTutarı'].fillna(0)
         pivot_df = pivot_df.drop(columns=['SatışTutarı'], errors='ignore')
     
     # SatışTutarı (mevcut yıl)
     if not satis_tutar_current_year.empty:
-        pivot_df = pivot_df.merge(satis_tutar_current_year, on=['Kategori', 'GrupAdı'], how='left')
+        pivot_df = pivot_df.merge(satis_tutar_current_year, on=['Kategori', 'Firma'], how='left')
         pivot_df[f'Satış Tutarı ({current_year})'] = pivot_df['SatışTutarı'].fillna(0)
         pivot_df = pivot_df.drop(columns=['SatışTutarı'], errors='ignore')
     
     # KarOranı
     if not kar_orani.empty:
-        pivot_df = pivot_df.merge(kar_orani, on=['Kategori', 'GrupAdı'], how='left')
+        pivot_df = pivot_df.merge(kar_orani, on=['Kategori', 'Firma'], how='left')
         pivot_df['KarOranı'] = pivot_df['KarOranı'].fillna(0)
     
     # Net Envanter
@@ -216,7 +224,7 @@ if all_data:
 
     
     # Yüzde hesaplamaları
-    pivot_df['GrupAdı Satış Yüzdesi'] = pivot_df[f'Satış Tutarı ({last_year})'] / pivot_df[f'Satış Tutarı ({last_year})'].sum() * 100
+    pivot_df['Firma Satış Yüzdesi'] = pivot_df[f'Satış Tutarı ({last_year})'] / pivot_df[f'Satış Tutarı ({last_year})'].sum() * 100
     pivot_df['Kategori Satış Yüzdesi'] = pivot_df.groupby('Kategori')[f'Satış Tutarı ({last_year})'].transform(
         lambda x: (x / x.sum() * 100) if x.sum() != 0 else 0
     )
@@ -225,17 +233,17 @@ if all_data:
     pivot_df['Bütçe Gerçekleşme Oranı'] = (pivot_df[f'Satış Tutarı ({current_year})'] / pivot_df['Bütçe'] * 100).fillna(0)
     
     # Sütun sırası
-    new_columns = ['Kategori', 'GrupAdı']
+    new_columns = ['Kategori', 'Firma']
     for month_end in month_end_dates:
         month_label = month_end.strftime("%d.%m.%Y")
         new_columns.append(f"{month_label} KalanTutar")
     new_columns.extend(['Alış Sipariş Tutarı', 'Satış Sipariş Tutarı', f'Satış Tutarı ({last_year})', f'Satış Tutarı ({current_year})', 'KarOranı'
-                    , 'Net Envanter'    , 'Bütçe', 'Bütçe Açığı',  'Stok Açığı/Fazlası', 'GrupAdı Satış Yüzdesi', 'Kategori Satış Yüzdesi', 'Bütçe Gerçekleşme Oranı'])
+                    , 'Net Envanter'    , 'Bütçe', 'Bütçe Açığı',  'Stok Açığı/Fazlası', 'Firma Satış Yüzdesi', 'Kategori Satış Yüzdesi', 'Bütçe Gerçekleşme Oranı'])
     
     pivot_df = pivot_df[new_columns]
     
     # Alt toplam
-    numeric_columns = [col for col in pivot_df.columns if col not in ['Kategori', 'GrupAdı']]
+    numeric_columns = [col for col in pivot_df.columns if col not in ['Kategori', 'Firma']]
     alt_toplam = pivot_df[numeric_columns].sum(numeric_only=True)
     alt_toplam_row = pd.DataFrame([['TOPLAM', ''] + alt_toplam.tolist()], columns=pivot_df.columns)
     pivot_df = pd.concat([pivot_df, alt_toplam_row], ignore_index=True)
@@ -293,7 +301,7 @@ html_template = """
 body = html_template.format(current_year, last_year)
 
 # Pivot tabloyu HTML'e çevir
-body += f"<h3>Kategori ve GrupAdına Göre Gruplama ({last_year} ve {current_year} Ciro Dağılımı ile)</h3>"
+body += f"<h3>Kategori ve Firmaya Göre Gruplama ({last_year} ve {current_year} Ciro Dağılımı ile)</h3>"
 if not pivot_df.empty:
     html_table_df = pivot_df.to_html(index=False, border=0, classes="data-table")
     for col in numeric_columns:
@@ -319,7 +327,7 @@ if not pivot_df.empty:
     html_table_df = html_table_df.replace('<tr>\n<td>TOPLAM</td>', '<tr class="alt-toplam">\n<td>TOPLAM</td>')
     body += '<div class="table-container">' + html_table_df + '</div>'
 else:
-    body += "<p>Kategori ve GrupAdı için veri bulunamadı.</p>"
+    body += "<p>Kategori ve firma için veri bulunamadı.</p>"
 
 # HTML altbilgisi
 body += """
