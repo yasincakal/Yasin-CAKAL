@@ -25,7 +25,12 @@ import smtplib
 import sys
 import threading
 import time
+import calendar
+import re
+import warnings
 from datetime import datetime
+
+import pandas as pd
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -35,6 +40,8 @@ from dotenv import load_dotenv
 from jinja2 import Environment, select_autoescape
 from sqlalchemy import create_engine, text
 
+warnings.filterwarnings('ignore', category=FutureWarning)
+
 load_dotenv()
 
 # ---------------------------------------------------------------------------
@@ -43,7 +50,7 @@ load_dotenv()
 
 SP_NAME = os.environ.get('PRIM_RAPORU_SP', 'YasinprimHesapla')
 _CACHE_TTL = int(os.environ.get('PRIM_RAPORU_CACHE_TTL', '14400'))
-_CACHE_VERSION = 9
+_CACHE_VERSION = 10
 _DATA_DIR = Path(os.environ.get('PRIM_RAPORU_DATA_DIR', Path(__file__).resolve().parent / 'data'))
 _CACHE_FILE = _DATA_DIR / 'prim_raporu_cache.pkl.gz'
 
@@ -57,6 +64,7 @@ EMAIL_SENDER = os.getenv('EMAIL_SENDER', 'butce@evdema.com')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO = [x.strip() for x in os.getenv('EMAIL_TO', 'yasincakal@evdema.com').split(',') if x.strip()]
 MAX_KISI = int(os.environ.get('PRIM_RAPORU_MAX_KISI', '0'))
+KISI_BASLI = os.environ.get('PRIM_RAPORU_KISI_BASLI', '1').lower() not in ('0', 'false', 'no')
 
 LOG_FILE = os.environ.get('PRIM_RAPORU_LOG', 'prim_raporu_mail.log')
 logging.basicConfig(
@@ -327,7 +335,11 @@ def _satirlari_basitlestir(rows: list[dict]) -> list[dict]:
         kar = _float_val(_row_key(r, 'Kar'))
         ciro_prim = _float_val(_row_key(r, 'Ciro Prim Hakedişi'))
         kar_prim = _float_val(_row_key(r, 'Kar Prim Hakedişi'))
-        odenen_ciro = _float_val(_row_key(r, 'Ödenen Ciro Primi'))
+        ciro_prim_ucreti = _float_val(_row_key(r, 'Ciro Prim Ücreti'))
+        kar_prim_ucreti = _float_val(_row_key(r, 'Kar Prim Ücreti'))
+        odenen_ciro = _float_val(_row_key(
+            r, 'Ödenen Ciro/Tahsilat Primi', 'Ödenen Ciro Primi',
+        ))
         odenen_kar = _float_val(_row_key(r, 'Ödenen Kar Primi'))
         prim_turu = str(_row_key(r, 'primaciklama', 'PrimAciklama') or '—').strip() or '—'
         prim_davranisi = str(_row_key(r, 'PrimDavranisi', 'primdavranisi') or '').strip()
@@ -348,8 +360,9 @@ def _satirlari_basitlestir(rows: list[dict]) -> list[dict]:
             _yuzde_hesapla(kar, kar_hedef, kar_ay_sp)
             if prim_davranis_kod in ('hem_ikisi', 'aylik') else None
         )
-        toplam_prim = round(ciro_prim + kar_prim, 2)
+        toplam_hakedis = round(ciro_prim + kar_prim, 2)
         toplam_odenen = round(odenen_ciro + odenen_kar, 2)
+        prim_ucreti_toplam = round(ciro_prim_ucreti + kar_prim_ucreti, 2)
         oncelik = str(_row_key(r, 'Oncelik') or '').strip()
         birincil_hedef = _oncelik_1_hedef_mi(oncelik)
         sonuc.append({
@@ -372,10 +385,20 @@ def _satirlari_basitlestir(rows: list[dict]) -> list[dict]:
             'kar_yuzde_kum': kar_yuzde_kum, 'kar_yuzde_ay': kar_yuzde_ay,
             'kar_durum_kod': _durum_kod(kar_yuzde_kum, kar_hedef),
             'ciro_prim': ciro_prim, 'kar_prim': kar_prim,
-            'alacagi_prim': toplam_prim, 'odenen': toplam_odenen,
-            'kalan': round(toplam_prim - toplam_odenen, 2),
+            'ciro_prim_ucreti': ciro_prim_ucreti, 'kar_prim_ucreti': kar_prim_ucreti,
+            'prim_ucreti_toplam': prim_ucreti_toplam,
+            'alacagi_prim': toplam_hakedis, 'hakedis': toplam_hakedis,
+            'odenen': toplam_odenen,
+            'odenen_ciro': odenen_ciro, 'odenen_kar': odenen_kar,
+            'kalan': round(toplam_hakedis - toplam_odenen, 2),
             'oncelik': oncelik, 'birincil_hedef': birincil_hedef,
             'hedef_oran_sp': _float_val(_row_key(r, 'HedefOran')),
+            'mail': str(_row_key(r, 'mail') or '').strip(),
+            'mailcc': str(_row_key(r, 'mailcc') or '').strip(),
+            'prim_kategori': str(_row_key(r, 'Primkategori') or '').strip(),
+            'bekleyen_siparis': _float_val(_row_key(
+                r, 'BekleyenSipariş', 'Bekleyen Sipariş', 'BekleyenSiparis',
+            )),
         })
     return _kumulatif_rakamlar_uygula(sonuc)
 
@@ -427,7 +450,8 @@ def _ay_satir_olustur(s: dict) -> dict:
         'kar_yuzde_kum': s['kar_yuzde_kum'], 'kar_yuzde_ay': s['kar_yuzde_ay'],
         'kar_durum_kod': s['kar_durum_kod'],
         'ciro_prim': s['ciro_prim'], 'kar_prim': s['kar_prim'],
-        'alacagi_prim': s['alacagi_prim'],
+        'prim_ucreti_toplam': s.get('prim_ucreti_toplam', 0),
+        'alacagi_prim': s['alacagi_prim'], 'hakedis': s.get('hakedis', s['alacagi_prim']),
         'ciro_var': s['ciro_var'], 'kar_var': s['kar_var'],
         'odenen': s['odenen'], 'kalan': s['kalan'],
         'hedef_oran': s.get('hedef_oran'), 'hedef_tuttu': s.get('hedef_tuttu'),
@@ -448,11 +472,13 @@ def _prim_turu_kart_olustur(satirlar: list[dict], donem_sira: dict[str, int]) ->
         'goster_ay': ilk.get('goster_ay', pd in ('aylik', 'hem_ikisi')),
         'hedef_1_gecerli': ilk['hedef_1_gecerli'], 'cari_yil': _cari_yil_mi(yil), 'yil': yil,
         'birincil_hedef': ilk.get('birincil_hedef', False), 'aylar': aylar,
-        'toplam_prim': round(sum(a['alacagi_prim'] for a in aylar), 2),
-        'toplam_ciro_prim': round(sum(a['ciro_prim'] for a in aylar), 2),
-        'toplam_kar_prim': round(sum(a['kar_prim'] for a in aylar), 2),
+        'toplam_prim_ucreti': round(sum(a.get('prim_ucreti_toplam', 0) for a in aylar), 2),
+        'toplam_hakedis': round(sum(a.get('hakedis', a['alacagi_prim']) for a in aylar), 2),
         'toplam_odenen': round(sum(a['odenen'] for a in aylar), 2),
         'toplam_kalan': round(sum(a['kalan'] for a in aylar), 2),
+        'toplam_prim': round(sum(a.get('hakedis', a['alacagi_prim']) for a in aylar), 2),
+        'toplam_ciro_prim': round(sum(a['ciro_prim'] for a in aylar), 2),
+        'toplam_kar_prim': round(sum(a['kar_prim'] for a in aylar), 2),
         'ay_sayisi': len(aylar), 'tahsilat': ilk['tahsilat'],
         'ciro_var': any(a['ciro_var'] for a in aylar),
         'kar_var': any(a['kar_var'] for a in aylar),
@@ -658,6 +684,292 @@ def basit_ozet(satirlar: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Dashboard (eski e-posta kodu — kişi bazlı)
+# ---------------------------------------------------------------------------
+
+COLOR_PALETTE = {
+    'primary': '#4f46e5', 'success': '#16a34a', 'warning': '#d97706', 'danger': '#dc2626',
+    'gray': '#6b7280', 'light': '#f3f4f6', 'dark': '#1f2937', 'border': '#e2e8f0',
+    'ciro': '#3b82f6', 'kar': '#8b5cf6', 'tahsilat': '#22c55e',
+    'header-bg': '#f8fafc', 'header-text': '#374151', 'accent': '#a855f7', 'info': '#0ea5e9',
+    'gradient-primary': 'linear-gradient(135deg, #4f46e5 0%, #a855f7 100%)',
+}
+
+MONTH_NAMES = {
+    '01-Ocak': 1, '02-Şubat': 2, '03-Mart': 3, '04-Nisan': 4, '05-Mayıs': 5, '06-Haziran': 6,
+    '07-Temmuz': 7, '08-Ağustos': 8, '09-Eylül': 9, '10-Ekim': 10, '11-Kasım': 11, '12-Aralık': 12,
+}
+ALL_QUARTERS = [f'{q}. Çeyrek' for q in range(1, 5)]
+ALL_MONTHS = list(MONTH_NAMES.keys())
+PERIOD_ORDER = ALL_QUARTERS + ALL_MONTHS
+
+
+def _fmt_tl(number, decimals: int = 2, currency: str = '₺') -> str:
+    try:
+        v = float(number or 0)
+        formatted = f'{abs(v):,.{decimals}f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+        if v < 0:
+            formatted = f'-{formatted}'
+        return f'{formatted} {currency}'
+    except (TypeError, ValueError):
+        return f'0,00 {currency}'
+
+
+def _to_num(series) -> pd.Series:
+    if series is None:
+        return pd.Series(dtype=float)
+    s = series.astype(str).str.replace(r'[₺\s]', '', regex=True).str.replace('.', '', regex=False)
+    s = s.str.replace(',', '.', regex=False)
+    return pd.to_numeric(s, errors='coerce').fillna(0.0)
+
+
+def _satirlar_to_df(satirlar: list[dict]) -> pd.DataFrame:
+    rows = []
+    for s in satirlar:
+        rows.append({
+            'AdiSoyadi': s['satici'], 'KarMerkezi': s['bolge'], 'primaciklama': s['prim_turu'],
+            'Dönem': s['donem'], 'CiroHedefi': s['ciro_hedef'], 'Ciro': s['ciro'],
+            'KarHedefi': s['kar_hedef'], 'Kar': s['kar'],
+            'Ciro Prim Ücreti': s.get('ciro_prim_ucreti', 0),
+            'Kar Prim Ücreti': s.get('kar_prim_ucreti', 0),
+            'Ciro Prim Hakedişi': s.get('ciro_prim', 0),
+            'Kar Prim Hakedişi': s.get('kar_prim', 0),
+            'Ödenen Kar Primi': s.get('odenen_kar', 0),
+            'Ödenen Ciro/Tahsilat Primi': s.get('odenen_ciro', 0),
+            'Oncelik': s.get('oncelik', ''), 'Primkategori': s.get('prim_kategori', ''),
+            'mail': s.get('mail', ''), 'mailcc': s.get('mailcc', ''),
+            'ButceYoneticisi': s.get('yonetici', ''),
+            'BekleyenSipariş': s.get('bekleyen_siparis', 0),
+        })
+    df = pd.DataFrame(rows)
+    if not df.empty and 'Dönem' in df.columns:
+        df['Dönem'] = pd.Categorical(df['Dönem'], categories=PERIOD_ORDER, ordered=True)
+        df = df.sort_values('Dönem')
+    return df
+
+
+def _get_target_status(target: float, actual: float) -> dict:
+    if target == 0:
+        return {'percentage': 0, 'gap': 0, 'status': 'neutral', 'color': COLOR_PALETTE['gray']}
+    percentage = actual / target * 100
+    gap = target - actual
+    if percentage >= 100:
+        return {'percentage': 100, 'gap': 0, 'status': 'success', 'color': COLOR_PALETTE['success']}
+    if percentage >= 80:
+        return {'percentage': percentage, 'gap': gap, 'status': 'warning', 'color': COLOR_PALETTE['warning']}
+    return {'percentage': percentage, 'gap': gap, 'status': 'danger', 'color': COLOR_PALETTE['danger']}
+
+
+def _battery_icon(real_percentage: float) -> str:
+    pct = round(max(0, min(100, real_percentage)))
+    fill = '#10b981' if pct >= 90 else '#f59e0b' if pct >= 65 else '#ef4444'
+    return f"""
+    <div style="width:100%;font-family:Arial,sans-serif;">
+      <div style="text-align:center;margin-bottom:6px;">
+        <span style="font-size:28px;font-weight:800;color:{fill};">{pct}%</span>
+      </div>
+      <div style="border:2px solid {fill};border-radius:22px;padding:2px;background:#fff;">
+        <div style="height:40px;background:#f3f4f6;border-radius:20px;overflow:hidden;">
+          <div style="height:100%;width:{pct}%;background:{fill};border-radius:20px;"></div>
+        </div>
+      </div>
+    </div>"""
+
+
+def _period_info(df_period: pd.DataFrame, current_year: int) -> tuple[str, str]:
+    if df_period is None or df_period.empty:
+        return '—', '(—)'
+    periods = [p for p in df_period['Dönem'].dropna().unique()]
+    month_list = [str(p).split('-')[1] for p in periods if '-' in str(p)]
+    quarter_list = [p for p in periods if p in ALL_QUARTERS]
+    if quarter_list:
+        label = ' – '.join(sorted(quarter_list, key=lambda x: int(str(x).split('.')[0])))
+        sub = 'Çeyrek dönemi toplam verileri'
+    elif month_list:
+        label = month_list[0] if len(month_list) == 1 else f'{month_list[0]} – {month_list[-1]}'
+        sub = f'{label} dönemi toplam verileri'
+    else:
+        label, sub = '—', '—'
+    return f'{label} {current_year}', f'({sub})'
+
+
+def _target_progress_card(
+    target: float, actual: float, title_key: str, period_label: str, period_detail: str,
+    yearly_target: float, yearly_actual: float, col_type: str, remaining_period: int,
+    remaining_year: int, bekleyen: float = 0,
+) -> str:
+    real_pct = (actual / target * 100) if target > 0 else 0
+    yearly_pct = (yearly_actual / yearly_target * 100) if yearly_target > 0 else 0
+    gap = target - actual
+    yearly_gap = yearly_target - yearly_actual
+    if col_type == 'ciro':
+        base, grad = '#3b82f6', COLOR_PALETTE['gradient-primary']
+    elif col_type == 'kar':
+        base, grad = '#8b5cf6', 'linear-gradient(135deg, #16a34a 0%, #86efac 100%)'
+    else:
+        base, grad = '#10b981', 'linear-gradient(135deg, #f59e0b 0%, #facc15 100%)'
+
+    def _gap_text(g: float, pct: float) -> tuple[str, str]:
+        if pct >= 100:
+            return ('🎉 Hedef Aşıldı!' if pct > 100 else '🎉 Hedef Ulaşıldı!'), COLOR_PALETTE['success']
+        if g > 0:
+            return f'{_fmt_tl(g, 0)} Açık', COLOR_PALETTE['danger']
+        return f'{_fmt_tl(abs(g), 0)} Fazla', COLOR_PALETTE['success']
+
+    gap_text, gap_color = _gap_text(gap, real_pct)
+    y_gap_text, y_gap_color = _gap_text(yearly_gap, yearly_pct)
+    bekleyen_html = (
+        f'<div style="font-size:13px;color:{base};font-weight:600;margin:8px 0;">'
+        f'Bekleyen Sipariş: {_fmt_tl(bekleyen, 0)}</div>'
+        if col_type == 'ciro' else ''
+    )
+    return f"""
+    <div style="border:2px solid {base};border-radius:12px;padding:12px;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.08);">
+      <div style="text-align:center;background:{base};color:#fff;padding:8px;border-radius:6px;margin-bottom:10px;">
+        <span style="font-size:22px;font-weight:900;">{title_key}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        <div style="flex:1;min-width:240px;background:#f8fafc;border-radius:8px;padding:12px;">
+          <div style="background:{base};color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;margin-bottom:8px;">
+            Dönem: {period_label} {period_detail}
+          </div>
+          <div style="font-size:13px;margin-bottom:4px;"><strong>Dönem Hedefi:</strong> {_fmt_tl(target, 0)}</div>
+          <div style="font-size:13px;margin-bottom:4px;"><strong>Gerçekleşen:</strong> {_fmt_tl(actual, 0)}</div>
+          <div style="font-size:13px;color:{gap_color};font-weight:700;">Açık/Fazla: {gap_text}</div>
+          {bekleyen_html}
+          <div style="margin:10px 0;">{_battery_icon(real_pct)}</div>
+          <div style="font-size:12px;">⏰ Kalan gün: <strong>{remaining_period}</strong></div>
+        </div>
+        <div style="flex:1;min-width:240px;background:#f8fafc;border-radius:8px;padding:12px;">
+          <div style="background:{base};color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;margin-bottom:8px;">
+            {datetime.now().year} Yıllık Hedef
+          </div>
+          <div style="font-size:13px;margin-bottom:4px;"><strong>Yıllık Hedef:</strong> {_fmt_tl(yearly_target, 0)}</div>
+          <div style="font-size:13px;margin-bottom:4px;"><strong>Yıllık Gerçekleşen:</strong> {_fmt_tl(yearly_actual, 0)}</div>
+          <div style="font-size:13px;color:{y_gap_color};font-weight:700;">Açık/Fazla: {y_gap_text}</div>
+          <div style="margin:10px 0;">{_battery_icon(yearly_pct) if yearly_target > 0 else ''}</div>
+          <div style="font-size:12px;">⏰ Kalan gün: <strong>{remaining_year}</strong></div>
+        </div>
+      </div>
+    </div>"""
+
+
+def _league_tables_all(df: pd.DataFrame) -> dict[str, str]:
+    filtered = df[df['Oncelik'] == '1.Hedef'].copy()
+    if filtered.empty:
+        return {}
+    for col in ('Ciro', 'CiroHedefi', 'BekleyenSipariş'):
+        if col in filtered.columns:
+            filtered[col] = _to_num(filtered[col])
+    league = filtered.groupby(['Primkategori', 'AdiSoyadi', 'KarMerkezi'], as_index=False).agg({
+        'Ciro': 'sum', 'CiroHedefi': 'sum', 'BekleyenSipariş': 'sum',
+    })
+    league['Performans'] = (league['Ciro'] / league['CiroHedefi'].replace(0, 1) * 100).round(0)
+    out: dict[str, str] = {}
+    for cat in league['Primkategori'].dropna().unique():
+        cat_df = league[league['Primkategori'] == cat].sort_values('Ciro', ascending=False).reset_index(drop=True)
+        if cat_df.empty:
+            continue
+        rows_html = ''
+        for i, row in cat_df.iterrows():
+            rank = '🥇' if i == 0 else '🥈' if i == 1 else '🥉' if i == 2 else f'#{i + 1}'
+            perf = float(row['Performans'] or 0)
+            perf_color = COLOR_PALETTE['success'] if perf >= 100 else COLOR_PALETTE['warning'] if perf >= 80 else COLOR_PALETTE['danger']
+            rows_html += (
+                f'<tr><td>{rank}</td><td>{cat}</td><td>{row["AdiSoyadi"]}</td>'
+                f'<td style="text-align:right">{_fmt_tl(row["Ciro"], 0)}</td>'
+                f'<td style="text-align:right">{_fmt_tl(row["BekleyenSipariş"], 0)}</td>'
+                f'<td style="text-align:right;color:{perf_color};font-weight:700;">{perf:.0f}%</td></tr>'
+            )
+        out[str(cat)] = (
+            '<table class="dash-tbl" width="100%"><thead><tr>'
+            '<th>#</th><th>Kategori</th><th>Kişi</th><th>Gerçek</th><th>Bekleyen</th><th>%</th>'
+            f'</tr></thead><tbody>{rows_html}</tbody></table>'
+        )
+    return out
+
+
+def _dashboard_hedef_html(km_df: pd.DataFrame) -> str:
+    now = datetime.now()
+    cy, cm = now.year, now.month
+    cq = (cm - 1) // 3 + 1
+    ytd_q = [f'{q}. Çeyrek' for q in range(1, cq + 1)]
+    ytd_m = [m for m, n in MONTH_NAMES.items() if n <= cm]
+    ytd = km_df[km_df['Dönem'].isin(ytd_q + ytd_m)].copy()
+
+    personal_ytd = ytd[(ytd['primaciklama'] == 'Kişisel Bütçe') | (ytd['Oncelik'] == '1.Hedef')]
+    personal_all = km_df[(km_df['primaciklama'] == 'Kişisel Bütçe') | (km_df['Oncelik'] == '1.Hedef')]
+
+    ciro_h_ytd = _to_num(personal_ytd['CiroHedefi']).sum()
+    ciro_ytd = _to_num(personal_ytd['Ciro']).sum()
+    kar_h_ytd = _to_num(personal_ytd['KarHedefi']).sum()
+    kar_ytd = _to_num(personal_ytd['Kar']).sum()
+    ciro_h_year = _to_num(personal_all['CiroHedefi']).sum()
+    ciro_year = _to_num(personal_all['Ciro']).sum()
+    kar_h_year = _to_num(personal_all['KarHedefi']).sum()
+    kar_year = _to_num(personal_all['Kar']).sum()
+
+    tah_ytd_rows = ytd[ytd['primaciklama'].isin(['Z-Tahsilat Bütçesi', 'Z-Bağlantı Tahsilatı'])]
+    tah_h_ytd = _to_num(tah_ytd_rows['CiroHedefi']).sum()
+    tah_ytd_val = _to_num(tah_ytd_rows['Ciro']).sum()
+    tah_all = km_df[km_df['primaciklama'].isin(['Z-Tahsilat Bütçesi', 'Z-Bağlantı Tahsilatı'])]
+    tah_h_year = _to_num(tah_all['CiroHedefi']).sum()
+    tah_year = _to_num(tah_all['Ciro']).sum()
+    tah_baslik = 'Bağlantı Hedefi' if 'Z-Bağlantı Tahsilatı' in tah_ytd_rows['primaciklama'].values else 'Tahsilat'
+
+    bekleyen = 0.0
+    bdf = ytd[ytd['Oncelik'] == '1.Hedef']
+    if not bdf.empty and 'BekleyenSipariş' in bdf.columns:
+        bekleyen = _to_num(bdf['BekleyenSipariş']).sum()
+
+    rem_year = max(0, (datetime(cy, 12, 31) - now).days)
+    last_m = cm
+    rem_period = max(0, (datetime(cy, last_m, calendar.monthrange(cy, last_m)[1]) - now).days)
+    pinfo = _period_info(personal_ytd, cy)
+
+    cards = []
+    if ciro_h_ytd > 0 or ciro_ytd > 0:
+        cards.append(_target_progress_card(
+            ciro_h_ytd, ciro_ytd, 'Ciro', pinfo[0], pinfo[1],
+            ciro_h_year, ciro_year, 'ciro', rem_period, rem_year, bekleyen,
+        ))
+    if kar_h_ytd > 0 or kar_ytd > 0:
+        cards.append(_target_progress_card(
+            kar_h_ytd, kar_ytd, 'Kar', pinfo[0], pinfo[1],
+            kar_h_year, kar_year, 'kar', rem_period, rem_year,
+        ))
+    if tah_h_ytd > 0 or tah_ytd_val > 0:
+        cards.append(_target_progress_card(
+            tah_h_ytd, tah_ytd_val, tah_baslik, _period_info(tah_ytd_rows, cy)[0],
+            _period_info(tah_ytd_rows, cy)[1], tah_h_year, tah_year, 'tahsilat', rem_period, rem_year,
+        ))
+    if not cards:
+        return ''
+    return (
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));'
+        f'gap:16px;margin-bottom:20px;">{"".join(cards)}</div>'
+    )
+
+
+def _league_html_for_person(km_df: pd.DataFrame, league_all: dict[str, str]) -> str:
+    cats = km_df[km_df['Oncelik'] == '1.Hedef']['Primkategori'].dropna().unique().tolist()[:3]
+    cq = (datetime.now().month - 1) // 3 + 1
+    parts = []
+    for cat in cats:
+        tbl = league_all.get(str(cat), '')
+        if not tbl:
+            continue
+        parts.append(
+            f'<div style="background:#fff;border:1px solid {COLOR_PALETTE["border"]};border-radius:16px;'
+            f'overflow:hidden;margin-bottom:16px;box-shadow:0 4px 16px rgba(0,0,0,.08);">'
+            f'<div style="background:{COLOR_PALETTE["gradient-primary"]};color:#fff;padding:16px 20px;'
+            f'font-weight:800;">🏆 {cat} <span style="opacity:.85;font-size:13px;">Q{cq} {datetime.now().year}</span></div>'
+            f'<div style="padding:12px;overflow-x:auto;">{tbl}</div></div>'
+        )
+    return ''.join(parts) if parts else ''
+
+
+# ---------------------------------------------------------------------------
 # Önbellek + veritabanı
 # ---------------------------------------------------------------------------
 
@@ -775,12 +1087,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .hero-rozet{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#93c5fd}
   .aciklama{font-size:14.5px;color:#c7d2e0;line-height:1.6;margin:8px 0 0}
   .cache-not{font-size:13px;color:#bae6fd;margin-top:10px}
-  .ozet-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-  .ozet-item{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
-  .ozet-item span{font-size:11px;color:var(--muted-2);text-transform:uppercase;font-weight:800}
-  .ozet-item strong{display:block;font-size:22px;font-weight:800;margin-top:4px}
-  .ozet-item.prim strong{color:var(--green)}
-  .sayim-satir{font-size:13px;color:var(--muted-2);margin-bottom:14px;font-weight:600}
   .kart-listesi{display:flex;flex-direction:column;gap:22px}
   .kisi-kart{background:var(--panel);border-radius:18px;overflow:hidden;border:1px solid var(--line);margin-bottom:8px}
   .kisi-baslik{background:linear-gradient(135deg,#0b1220,#1e3a5f);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
@@ -792,11 +1098,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .prim-blok{background:#fff;border:1px solid var(--line);border-left:5px solid var(--indigo);border-radius:14px;margin-bottom:14px;overflow:hidden}
   .prim-blok.tahsilat-blok{border-left-color:var(--sky)}
   .prim-blok.hedef-1{border-left-color:var(--amber)}
-  .prim-blok-ust{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;padding:14px 18px;border-bottom:2px solid var(--line);background:#eef1f8;width:100%}
-  .prim-blok-ust h4{margin:0;font-size:17px;font-weight:800}
+  .prim-blok-ust{display:block;padding:14px 18px;border-bottom:2px solid var(--line);background:#eef1f8;width:100%}
+  .prim-baslik-satir{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
+  .prim-blok-ust h4{margin:0;font-size:17px;font-weight:800;display:inline}
   .blok-rozet{font-size:10px;font-weight:800;text-transform:uppercase;padding:4px 9px;border-radius:7px;background:#eef2f7;border:1px solid #e2e8f0}
-  .prim-ozet-strip{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;flex:1;justify-content:flex-end;min-width:280px}
-  .prim-ozet-kart{flex:1 1 140px;max-width:200px;background:#fff;border-radius:12px;padding:10px 14px;text-align:center;border:2px solid var(--line)}
+  .prim-ozet-table{width:100%;border-collapse:separate;border-spacing:8px;table-layout:fixed}
+  .prim-ozet-kart{background:#fff;border-radius:12px;padding:12px 10px;text-align:center;border:2px solid var(--line);vertical-align:top}
   .prim-ozet-kart .etiket{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2)}
   .prim-ozet-kart .tutar{font-size:20px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
   .prim-ozet-kart.toplam{border-color:#c7d2fe;background:#f5f7ff}
@@ -831,59 +1138,59 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .yuzde-ay{font-size:11px;color:var(--muted);font-weight:700}
   .bos{color:#cbd5e1}
   .footer{margin-top:30px;font-size:12px;color:var(--muted);text-align:center}
-  .kurallar{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;font-size:13px;line-height:1.7;color:var(--ink-soft)}
-  .kurallar h4{margin:12px 0 6px;font-size:14px;color:var(--ink)}
+  .dash-tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .dash-tbl th,.dash-tbl td{padding:10px 8px;border-bottom:1px solid var(--line-soft)}
+  .dash-tbl th{background:#f8fafc;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted)}
+  .email-header{background:linear-gradient(135deg,#4f46e5,#1d4ed8,#3b82f6);color:#fff;padding:28px 20px;text-align:center;border-radius:16px;margin-bottom:20px}
+  .email-header h1{margin:0;font-size:28px;font-weight:800}
+  .email-header p{margin:10px 0 0;opacity:.92}
+  .section-hdr{font-size:18px;font-weight:800;margin:20px 0 12px;padding:12px 16px;background:#fff;border-radius:12px;border-left:5px solid var(--blue)}
 </style>
 </head>
 <body>
 <main class="rapor-govde">
+  {% if kisi_adi %}
+  <div class="email-header">
+    <h1>Merhaba {{ kisi_adi }}!</h1>
+    <p>Q{{ ceyrek }} {{ yil }} performans ve prim raporunuz</p>
+    {% if cache_tarih %}<p style="font-size:13px;margin-top:8px;opacity:.85">Veri: {{ cache_tarih }}</p>{% endif %}
+  </div>
+  {% if dashboard_html %}{{ dashboard_html | safe }}{% endif %}
+  {% if league_html %}
+  <div class="section-hdr">🏆 Lig Sıralaması</div>
+  {{ league_html | safe }}
+  {% endif %}
+  <div class="section-hdr">📊 Prim Detayları</div>
+  {% else %}
   <div class="ust-bar">
     <div class="hero-rozet">Prim Raporu · {{ rapor_tarihi }}</div>
-    <p class="aciklama">Üstte kişinin <strong>toplam hak edişi</strong>, altında <strong>her prim türü ayrı kutu</strong> olarak gösterilir.</p>
     {% if cache_tarih %}<div class="cache-not">Veri: {{ cache_tarih }}</div>{% endif %}
   </div>
-
-  <div class="kurallar">
-    <h4>Ödeme mantığı</h4>
-    <ul>
-      <li><strong>Tüm primler aylık ödenir.</strong> Kümülatif primde o ay %100 olursa geçmiş aylar da ödenir.</li>
-      <li><strong>1.Hedef</strong> tutmazsa ona tabi primler ödenmez (tahsilat, aylık bağımsız vb. hariç).</li>
-    </ul>
-  </div>
-
-  <div class="ozet-strip">
-    <div class="ozet-item"><span>Satışçı</span><strong>{{ ozet.kisi }}</strong></div>
-    <div class="ozet-item"><span>Toplam ciro</span><strong>{{ ozet.toplam_ciro | format_tl }}</strong></div>
-    <div class="ozet-item"><span>Toplam kar</span><strong>{{ ozet.toplam_kar | format_tl }}</strong></div>
-    <div class="ozet-item prim"><span>Alınacak prim</span><strong>{{ ozet.toplam_prim | format_tl }}</strong></div>
-  </div>
-  <p class="sayim-satir">{{ toplam_kart }} satışçı · {{ toplam_kayit }} kayıt</p>
+  {% endif %}
 
   <div class="kart-listesi">
   {% for kisi in kartlar %}
     <article class="kisi-kart">
+      {% if not kisi_adi %}
       <div class="kisi-baslik">
         <div>
           <div class="kisi-isim">{{ kisi.satici }}</div>
           <div class="kisi-meta">{{ kisi.firma }} · {{ kisi.bolge }}{% if kisi.kod %} · {{ kisi.kod }}{% endif %}</div>
         </div>
-        <div class="kisi-toplam">
-          <div style="font-size:11px;color:#9fb0c5">Toplam hak ediş</div>
-          <div class="tutar">{{ kisi.toplam_prim | format_tl }}</div>
-          <div style="font-size:12px;color:#9fb0c5">{{ kisi.prim_sayisi }} prim türü</div>
-        </div>
       </div>
+      {% endif %}
       <div class="kart-govde">
         {% if kisi.hedef_1 %}
         <section class="prim-blok hedef-1">
           <div class="prim-blok-ust">
-            <div><span class="blok-rozet">1.Hedef</span> <h4 style="display:inline">{{ kisi.hedef_1.prim_turu }}</h4></div>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-            {% if kisi.hedef_1.aciklama %}
-            <span class="oran-rozet {% if kisi.hedef_1.aciklama.tuttu %}tuttu{% else %}tutmadi{% endif %}">{{ kisi.hedef_1.aciklama.baslik }}</span>
-            {% endif %}
-            {{ prim_ozet_kartlari(kisi.hedef_1) }}
+            <div class="prim-baslik-satir">
+              <span class="blok-rozet">1.Hedef</span>
+              <h4>{{ kisi.hedef_1.prim_turu }}</h4>
+              {% if kisi.hedef_1.aciklama %}
+              <span class="oran-rozet {% if kisi.hedef_1.aciklama.tuttu %}tuttu{% else %}tutmadi{% endif %}">{{ kisi.hedef_1.aciklama.baslik }}</span>
+              {% endif %}
             </div>
+            {{ prim_ozet_kartlari(kisi.hedef_1) }}
           </div>
           {% if kisi.hedef_1.aciklama %}
           <div class="kisi-aciklama">
@@ -902,8 +1209,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         {% for prim in kisi.primler %}
         <section class="prim-blok {% if prim.tahsilat or prim.prim_davranis_kod == 'hem_ikisi' or ('tahsilat' in prim.prim_turu|lower) %}tahsilat-blok{% endif %}">
           <div class="prim-blok-ust">
-            <div><span class="blok-rozet">{% if prim.tahsilat or prim.prim_davranis_kod == 'hem_ikisi' or ('tahsilat' in prim.prim_turu|lower) %}Tahsilat{% else %}Prim{% endif %}</span>
-              <h4 style="display:inline">{{ prim.prim_turu }}</h4></div>
+            <div class="prim-baslik-satir">
+              <span class="blok-rozet">{% if prim.tahsilat or prim.prim_davranis_kod == 'hem_ikisi' or ('tahsilat' in prim.prim_turu|lower) %}Tahsilat{% else %}Prim{% endif %}</span>
+              <h4>{{ prim.prim_turu }}</h4>
+            </div>
             {{ prim_ozet_kartlari(prim) }}
           </div>
           {% if prim.aciklama %}
@@ -991,20 +1300,22 @@ YUZDE_HUCRE_MACRO = r"""
 
 PRIM_OZET_KARTLARI_MACRO = r"""
 {% macro prim_ozet_kartlari(k) %}
-<div class="prim-ozet-strip">
-  <div class="prim-ozet-kart toplam {% if (k.toplam_prim or 0) <= 0 %}sifir{% endif %}">
-    <div class="etiket">Prim ücreti toplamı</div>
-    <div class="tutar">{{ k.toplam_prim | format_tl }}</div>
-  </div>
-  <div class="prim-ozet-kart hakedis {% if (k.toplam_odenen or 0) <= 0 %}sifir{% endif %}">
-    <div class="etiket">Hakediş</div>
-    <div class="tutar">{{ k.toplam_odenen | format_tl }}</div>
-  </div>
-  <div class="prim-ozet-kart kalan {% if (k.toplam_kalan or 0) <= 0 %}sifir{% endif %}">
-    <div class="etiket">Kalan</div>
-    <div class="tutar">{{ k.toplam_kalan | format_tl }}</div>
-  </div>
-</div>
+<table class="prim-ozet-table" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="33%" class="prim-ozet-kart toplam {% if (k.toplam_prim_ucreti or 0) <= 0 %}sifir{% endif %}">
+      <div class="etiket">Prim ücreti toplamı</div>
+      <div class="tutar">{{ k.toplam_prim_ucreti | format_tl }}</div>
+    </td>
+    <td width="33%" class="prim-ozet-kart hakedis {% if (k.toplam_hakedis or 0) <= 0 %}sifir{% endif %}">
+      <div class="etiket">Hakediş</div>
+      <div class="tutar">{{ k.toplam_hakedis | format_tl }}</div>
+    </td>
+    <td width="33%" class="prim-ozet-kart kalan {% if (k.toplam_kalan or 0) <= 0 %}sifir{% endif %}">
+      <div class="etiket">Kalan</div>
+      <div class="tutar">{{ k.toplam_kalan | format_tl }}</div>
+    </td>
+  </tr>
+</table>
 {% endmacro %}
 """
 
@@ -1016,16 +1327,28 @@ def _jinja_template():
     return env.from_string(full)
 
 
-def html_olustur(kartlar: list[dict], ozet: dict, cache_ts: float | None) -> str:
+def html_olustur(
+    kartlar: list[dict],
+    cache_ts: float | None,
+    *,
+    kisi_adi: str = '',
+    dashboard_html: str = '',
+    league_html: str = '',
+) -> str:
     tpl = _jinja_template()
     cache_tarih = datetime.fromtimestamp(cache_ts).strftime('%d.%m.%Y %H:%M') if cache_ts else ''
+    now = datetime.now()
     return tpl.render(
         kartlar=kartlar,
-        ozet=ozet,
         toplam_kart=len(kartlar),
         toplam_kayit=sum(k['prim_sayisi'] for k in kartlar),
         cache_tarih=cache_tarih,
-        rapor_tarihi=datetime.now().strftime('%d.%m.%Y'),
+        rapor_tarihi=now.strftime('%d.%m.%Y'),
+        kisi_adi=kisi_adi,
+        dashboard_html=dashboard_html,
+        league_html=league_html,
+        ceyrek=(now.month - 1) // 3 + 1,
+        yil=now.year,
     )
 
 
@@ -1034,21 +1357,23 @@ def html_olustur(kartlar: list[dict], ozet: dict, cache_ts: float | None) -> str
 # ---------------------------------------------------------------------------
 
 
-def mail_gonder(konu: str, html: str, alicilar: list[str] | None = None) -> None:
-    alicilar = alicilar or EMAIL_TO
+def mail_gonder(konu: str, html: str, alicilar: list[str], cc: list[str] | None = None) -> None:
     if not alicilar:
-        raise ValueError('EMAIL_TO tanımlı değil')
+        raise ValueError('Alıcı yok')
     if not EMAIL_PASSWORD:
         raise ValueError('EMAIL_PASSWORD tanımlı değil')
     msg = MIMEMultipart()
     msg['From'] = EMAIL_SENDER
     msg['To'] = ', '.join(alicilar)
+    if cc:
+        msg['Cc'] = ', '.join(cc)
     msg['Subject'] = konu
     msg.attach(MIMEText(html, 'html', 'utf-8'))
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
         server.starttls()
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-        server.send_message(msg)
+        recipients = list(alicilar) + (cc or [])
+        server.sendmail(EMAIL_SENDER, recipients, msg.as_string())
     logger.info('E-posta gönderildi → %s', msg['To'])
 
 
@@ -1079,25 +1404,78 @@ def main() -> int:
         yil=os.environ.get('PRIM_RAPORU_FILTRE_YIL', ''),
         arama=os.environ.get('PRIM_RAPORU_FILTRE_ARAMA', ''),
     )
+
+    full_df = _satirlar_to_df(filtrelenmis)
+    league_all = _league_tables_all(full_df)
+
+    if KISI_BASLI and '--toplu' not in sys.argv:
+        gonderilen = 0
+        gruplar: dict[tuple, list[dict]] = {}
+        for s in filtrelenmis:
+            key = (s['satici'], s['bolge'])
+            gruplar.setdefault(key, []).append(s)
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
+            smtp.starttls()
+            smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+            for (satici, bolge), k_satirlar in gruplar.items():
+                if MAX_KISI > 0 and gonderilen >= MAX_KISI:
+                    break
+                mail = next((x['mail'] for x in k_satirlar if x.get('mail')), '')
+                if not mail:
+                    logger.warning('Mail yok, atlandı: %s - %s', satici, bolge)
+                    continue
+                mailcc = next((x['mailcc'] for x in k_satirlar if x.get('mailcc')), '')
+                cc = ['yasincakal@evdema.com']
+                if mailcc:
+                    cc.extend(a.strip() for a in mailcc.split(',') if a.strip())
+                km_df = _satirlar_to_df(k_satirlar)
+                kartlar = grupla_kisi_kartlari(k_satirlar)
+                html = html_olustur(
+                    kartlar, cache_ts,
+                    kisi_adi=satici,
+                    dashboard_html=_dashboard_hedef_html(km_df),
+                    league_html=_league_html_for_person(km_df, league_all),
+                )
+                if '--html-only' in sys.argv:
+                    safe = re.sub(r'[^\w\-]', '_', satici)[:30]
+                    out = Path(os.environ.get('PRIM_RAPORU_HTML_OUT', f'prim_{safe}.html'))
+                    out.write_text(html, encoding='utf-8')
+                    print(f'HTML: {out}')
+                    continue
+                konu = (
+                    f'Satış Analiz Raporu - {satici} - {bolge} '
+                    f'({datetime.now().strftime("%m/%Y")})'
+                )
+                msg = MIMEMultipart()
+                msg['From'] = EMAIL_SENDER
+                msg['To'] = mail
+                msg['Cc'] = ', '.join(cc)
+                msg['Subject'] = konu
+                msg.attach(MIMEText(html, 'html', 'utf-8'))
+                try:
+                    smtp.sendmail(EMAIL_SENDER, [mail, *cc], msg.as_string())
+                    gonderilen += 1
+                    logger.info('Gönderildi: %s (%s)', mail, satici)
+                    print(f'OK: {satici} → {mail}')
+                except Exception as exc:
+                    logger.error('Gönderilemedi %s: %s', satici, exc)
+                    print(f'HATA {satici}: {exc}', file=sys.stderr)
+        print(f'Toplam {gonderilen} kişiye gönderildi')
+        return 0
+
     kartlar = grupla_kisi_kartlari(filtrelenmis)
     if MAX_KISI > 0:
         kartlar = kartlar[:MAX_KISI]
-    ozet = basit_ozet(filtrelenmis)
-    html = html_olustur(kartlar, ozet, cache_ts)
-
+    html = html_olustur(kartlar, cache_ts)
     if '--html-only' in sys.argv:
         out = Path(os.environ.get('PRIM_RAPORU_HTML_OUT', 'prim_raporu.html'))
         out.write_text(html, encoding='utf-8')
         print(f'HTML yazıldı: {out}')
         return 0
-
     yil = datetime.now().year
-    konu = os.environ.get(
-        'PRIM_RAPORU_MAIL_KONU',
-        f'{yil} Prim Raporu — {len(kartlar)} satışçı',
-    )
-    mail_gonder(konu, html)
-    print(f'OK: {len(kartlar)} satışçı, {len(EMAIL_TO)} alıcı')
+    konu = os.environ.get('PRIM_RAPORU_MAIL_KONU', f'{yil} Prim Raporu — {len(kartlar)} satışçı')
+    mail_gonder(konu, html, EMAIL_TO)
+    print(f'OK: toplu mail, {len(kartlar)} satışçı')
     return 0
 
 
