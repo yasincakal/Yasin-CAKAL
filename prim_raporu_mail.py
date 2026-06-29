@@ -767,8 +767,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     --amber:#f59e0b; --amber-ink:#b45309; --indigo:#6366f1; --sky:#0ea5e9;
     --radius:16px;
   }
-  *{box-sizing:border-box} body{margin:0;font-size:15px;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Tahoma,sans-serif}
-  .rapor-govde{width:100%;max-width:1100px;margin:0 auto;padding:22px 20px 40px}
+  html,body{width:100%!important;min-height:100%;margin:0;padding:0}
+  *{box-sizing:border-box}
+  body{font-size:15px;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Tahoma,sans-serif;-webkit-text-size-adjust:100%}
+  .rapor-govde{width:100%;max-width:none;margin:0;padding:14px 10px 32px}
   .ust-bar{background:linear-gradient(135deg,#0b1220,#1e3a5f);color:#fff;border-radius:18px;padding:24px 28px;margin-bottom:20px}
   .hero-rozet{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#93c5fd}
   .aciklama{font-size:14.5px;color:#c7d2e0;line-height:1.6;margin:8px 0 0}
@@ -790,11 +792,20 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .prim-blok{background:#fff;border:1px solid var(--line);border-left:5px solid var(--indigo);border-radius:14px;margin-bottom:14px;overflow:hidden}
   .prim-blok.tahsilat-blok{border-left-color:var(--sky)}
   .prim-blok.hedef-1{border-left-color:var(--amber)}
-  .prim-blok-ust{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 18px;border-bottom:2px solid var(--line);background:#eef1f8}
+  .prim-blok-ust{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;padding:14px 18px;border-bottom:2px solid var(--line);background:#eef1f8;width:100%}
   .prim-blok-ust h4{margin:0;font-size:17px;font-weight:800}
   .blok-rozet{font-size:10px;font-weight:800;text-transform:uppercase;padding:4px 9px;border-radius:7px;background:#eef2f7;border:1px solid #e2e8f0}
-  .hakedis-chip{text-align:right;background:#fff;border:2px solid #bbf7d0;border-radius:12px;padding:8px 16px}
-  .hakedis-chip .tutar{font-size:22px;font-weight:800;color:#15803d}
+  .prim-ozet-strip{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;flex:1;justify-content:flex-end;min-width:280px}
+  .prim-ozet-kart{flex:1 1 140px;max-width:200px;background:#fff;border-radius:12px;padding:10px 14px;text-align:center;border:2px solid var(--line)}
+  .prim-ozet-kart .etiket{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2)}
+  .prim-ozet-kart .tutar{font-size:20px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+  .prim-ozet-kart.toplam{border-color:#c7d2fe;background:#f5f7ff}
+  .prim-ozet-kart.toplam .tutar{color:#3730a3}
+  .prim-ozet-kart.hakedis{border-color:#bbf7d0;background:#f0fdf4}
+  .prim-ozet-kart.hakedis .tutar{color:#15803d}
+  .prim-ozet-kart.kalan{border-color:#fde68a;background:#fffbeb}
+  .prim-ozet-kart.kalan .tutar{color:#b45309}
+  .prim-ozet-kart.sifir .tutar{color:var(--muted-2)}
   .oran-rozet{font-size:14px;font-weight:800;padding:8px 14px;border-radius:12px}
   .oran-rozet.tuttu{background:#dcfce7;color:var(--green-ink)}
   .oran-rozet.tutmadi{background:#fef3c7;color:var(--amber-ink)}
@@ -803,10 +814,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .kisi-aciklama .sonuc.tuttu{color:var(--green-ink)}
   .kisi-aciklama .sonuc.tutmadi{color:var(--amber-ink)}
   .blok-tablo-baslik{font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted-2);padding:10px 18px 4px}
-  .ay-tablo{width:100%;border-collapse:collapse;font-size:12px}
+  .tablo-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .ay-tablo{width:100%;min-width:100%;border-collapse:collapse;font-size:12px;table-layout:auto}
   .ay-tablo th,.ay-tablo td{padding:8px 12px;border-bottom:1px solid var(--line-soft)}
   .ay-tablo th{font-size:10px;font-weight:800;color:var(--muted-2);text-transform:uppercase;background:#fafbfc}
   .ay-tablo th.grup-ciro{background:#eef5ff;color:var(--blue-deep);text-align:center}
+  .ay-tablo th.grup-tahsilat{background:#e0f2fe;color:#0369a1;text-align:center}
   .ay-tablo th.grup-kar{background:#effdf4;color:var(--green-ink);text-align:center}
   .ay-tablo th.grup-prim{background:#fff7ed;color:var(--amber-ink);text-align:center}
   .hucre-ciro{background:#f6fafe}.hucre-kar{background:#f5fdf8}
@@ -865,9 +878,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <section class="prim-blok hedef-1">
           <div class="prim-blok-ust">
             <div><span class="blok-rozet">1.Hedef</span> <h4 style="display:inline">{{ kisi.hedef_1.prim_turu }}</h4></div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
             {% if kisi.hedef_1.aciklama %}
             <span class="oran-rozet {% if kisi.hedef_1.aciklama.tuttu %}tuttu{% else %}tutmadi{% endif %}">{{ kisi.hedef_1.aciklama.baslik }}</span>
             {% endif %}
+            {{ prim_ozet_kartlari(kisi.hedef_1) }}
+            </div>
           </div>
           {% if kisi.hedef_1.aciklama %}
           <div class="kisi-aciklama">
@@ -884,12 +900,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         </section>
         {% endif %}
         {% for prim in kisi.primler %}
-        <section class="prim-blok {% if prim.tahsilat %}tahsilat-blok{% endif %}">
+        <section class="prim-blok {% if prim.tahsilat or prim.prim_davranis_kod == 'hem_ikisi' or ('tahsilat' in prim.prim_turu|lower) %}tahsilat-blok{% endif %}">
           <div class="prim-blok-ust">
-            <div><span class="blok-rozet">{% if prim.tahsilat %}Tahsilat{% else %}Prim{% endif %}</span>
+            <div><span class="blok-rozet">{% if prim.tahsilat or prim.prim_davranis_kod == 'hem_ikisi' or ('tahsilat' in prim.prim_turu|lower) %}Tahsilat{% else %}Prim{% endif %}</span>
               <h4 style="display:inline">{{ prim.prim_turu }}</h4></div>
-            <div class="hakedis-chip"><div style="font-size:10px;color:#16a34a">Hak ediş</div>
-              <div class="tutar">{{ prim.toplam_prim | format_tl }}</div></div>
+            {{ prim_ozet_kartlari(prim) }}
           </div>
           {% if prim.aciklama %}
           <div class="prim-aciklama-kutu">
@@ -914,23 +929,24 @@ PRIM_TABLO_MACRO = r"""
 {% macro prim_tablo(k) %}
 {% set gk = k.goster_kum|default(true) %}
 {% set ga = k.goster_ay|default(false) %}
+{% set is_tahsilat = k.tahsilat or k.prim_davranis_kod == 'hem_ikisi' or ('tahsilat' in (k.prim_turu|lower)) %}
 {% set ciro_span = (3 if gk else 0) + (3 if ga else 0) %}
 {% if ciro_span == 0 %}{% set ciro_span = 3 %}{% endif %}
 {% set ns = namespace(ciro_prim=0, kar_prim=0) %}
 {% for a in k.aylar %}{% set ns.ciro_prim = ns.ciro_prim + (a.ciro_prim or 0) %}{% set ns.kar_prim = ns.kar_prim + (a.kar_prim or 0) %}{% endfor %}
-<div style="overflow-x:auto">
+<div class="tablo-scroll">
 <table class="ay-tablo">
 <thead>
 <tr><th rowspan="2">Ay</th>
-<th colspan="{{ ciro_span }}" class="grup-ciro">{% if k.tahsilat %}TAHSİLAT{% else %}CİRO{% endif %}</th>
+<th colspan="{{ ciro_span }}" class="{% if is_tahsilat %}grup-tahsilat{% else %}grup-ciro{% endif %}">{% if is_tahsilat %}TAHSİLAT{% else %}CİRO (SATIŞ){% endif %}</th>
 {% if k.kar_var %}<th colspan="{{ ciro_span }}" class="grup-kar">KAR</th>{% endif %}
-<th colspan="{{ 2 if k.kar_var else 1 }}" class="grup-prim">PRİM</th></tr>
+<th colspan="{{ 2 if k.kar_var else 1 }}" class="grup-prim">PRİM (HAK EDİŞ)</th></tr>
 <tr>
 {% if gk %}<th class="para">Küm.Hedef</th><th class="para">Küm.Yaptı</th><th class="para">Küm%</th>{% endif %}
 {% if ga %}<th class="para">Ay Hedef</th><th class="para">Ay Yaptı</th><th class="para">Ay%</th>{% endif %}
 {% if k.kar_var %}{% if gk %}<th class="para">Küm.Hedef</th><th class="para">Küm.Yaptı</th><th class="para">Küm%</th>{% endif %}
 {% if ga %}<th class="para">Ay Hedef</th><th class="para">Ay Yaptı</th><th class="para">Ay%</th>{% endif %}{% endif %}
-<th class="para">Ciro Primi</th>{% if k.kar_var %}<th class="para">Kar Primi</th>{% endif %}
+<th class="para">{% if is_tahsilat %}Tahsilat Primi{% else %}Ciro Primi{% endif %}</th>{% if k.kar_var %}<th class="para">Kar Primi</th>{% endif %}
 </tr></thead>
 <tbody>
 {% for a in k.aylar %}
@@ -973,11 +989,30 @@ YUZDE_HUCRE_MACRO = r"""
 {% endmacro %}
 """
 
+PRIM_OZET_KARTLARI_MACRO = r"""
+{% macro prim_ozet_kartlari(k) %}
+<div class="prim-ozet-strip">
+  <div class="prim-ozet-kart toplam {% if (k.toplam_prim or 0) <= 0 %}sifir{% endif %}">
+    <div class="etiket">Prim ücreti toplamı</div>
+    <div class="tutar">{{ k.toplam_prim | format_tl }}</div>
+  </div>
+  <div class="prim-ozet-kart hakedis {% if (k.toplam_odenen or 0) <= 0 %}sifir{% endif %}">
+    <div class="etiket">Hakediş</div>
+    <div class="tutar">{{ k.toplam_odenen | format_tl }}</div>
+  </div>
+  <div class="prim-ozet-kart kalan {% if (k.toplam_kalan or 0) <= 0 %}sifir{% endif %}">
+    <div class="etiket">Kalan</div>
+    <div class="tutar">{{ k.toplam_kalan | format_tl }}</div>
+  </div>
+</div>
+{% endmacro %}
+"""
+
 
 def _jinja_template():
     env = Environment(autoescape=select_autoescape(['html']))
     env.filters['format_tl'] = format_tl
-    full = YUZDE_HUCRE_MACRO + PRIM_TABLO_MACRO + HTML_TEMPLATE
+    full = YUZDE_HUCRE_MACRO + PRIM_OZET_KARTLARI_MACRO + PRIM_TABLO_MACRO + HTML_TEMPLATE
     return env.from_string(full)
 
 
