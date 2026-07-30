@@ -48,7 +48,8 @@ export function Sidebar() {
         <div className="session-chip">
           <strong>{session.firmaAdi || `Firma ${session.firmaNr}`}</strong>
           <span>
-            Dönem {session.donemNr.padStart(2, "0")}
+            {session.firmaNr}/{session.donemNr.padStart(2, "0")}
+            {session.database ? ` · ${session.database}` : ""}
             {session.demoMode ? " · Demo" : ""}
           </span>
         </div>

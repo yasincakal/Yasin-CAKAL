@@ -89,23 +89,70 @@ export async function ensureViews(
   return statuses;
 }
 
-export async function listFirms() {
+export async function listFirmPeriods() {
   const pool = await getPool();
   const result = await pool.request().query<{
-    NR: number;
-    NAME: string;
-    TITLE: string;
-  }>(`SELECT NR, NAME, TITLE FROM L_CAPIFIRM ORDER BY NR`);
-  return result.recordset;
+    "Firma Adı": string;
+    Database: string;
+    "Firma No": string;
+    "Dönem No": string;
+    "Başlangıç Tarihi": Date;
+    "Bitiş Tarihi": Date;
+  }>(`
+SELECT
+  CAPIFIRM.NAME AS [Firma Adı],
+  CASE WHEN CAPIFIRM.DBNAME='' THEN DB_NAME() ELSE CAPIFIRM.DBNAME END AS [Database],
+  RIGHT('000'+CAST(CAPIFIRM.NR AS nvarchar(5)),3) AS [Firma No],
+  RIGHT('000'+CAST(CAPIPERIOD.NR AS nvarchar(5)),2) AS [Dönem No],
+  CAPIPERIOD.BEGDATE AS [Başlangıç Tarihi],
+  CAPIPERIOD.ENDDATE AS [Bitiş Tarihi]
+FROM L_CAPIFIRM CAPIFIRM WITH(NOLOCK)
+INNER JOIN L_CAPIPERIOD CAPIPERIOD WITH(NOLOCK) ON CAPIPERIOD.FIRMNR = CAPIFIRM.NR
+ORDER BY CAPIFIRM.NR, CAPIPERIOD.NR
+`);
+  return result.recordset.map((row) => ({
+    firmaAdi: String(row["Firma Adı"] ?? ""),
+    database: String(row.Database ?? ""),
+    firmaNr: String(row["Firma No"] ?? "").padStart(3, "0"),
+    donemNr: String(row["Dönem No"] ?? "").padStart(2, "0"),
+    donemBaslangic: toIsoDate(row["Başlangıç Tarihi"]),
+    donemBitis: toIsoDate(row["Bitiş Tarihi"]),
+  }));
 }
 
+function toIsoDate(value: Date | string | null | undefined) {
+  if (!value) return undefined;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toISOString().slice(0, 10);
+}
+
+/** @deprecated use listFirmPeriods */
+export async function listFirms() {
+  const rows = await listFirmPeriods();
+  const map = new Map<string, { NR: number; NAME: string; TITLE: string }>();
+  for (const r of rows) {
+    if (!map.has(r.firmaNr)) {
+      map.set(r.firmaNr, {
+        NR: Number(r.firmaNr),
+        NAME: r.firmaAdi,
+        TITLE: r.firmaAdi,
+      });
+    }
+  }
+  return [...map.values()];
+}
+
+/** @deprecated use listFirmPeriods */
 export async function listPeriods(firmaNr: string) {
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input("firma", Number(firmaNr))
-    .query<{ NR: number; BEGDATE: Date; ENDDATE: Date }>(
-      `SELECT NR, BEGDATE, ENDDATE FROM L_CAPIPERIOD WHERE FIRMNR = @firma ORDER BY NR`
-    );
-  return result.recordset;
+  const rows = await listFirmPeriods();
+  return rows
+    .filter((r) => Number(r.firmaNr) === Number(firmaNr))
+    .map((r) => ({
+      NR: Number(r.donemNr),
+      BEGDATE: r.donemBaslangic,
+      ENDDATE: r.donemBitis,
+      DATABASE: r.database,
+      NAME: r.firmaAdi,
+    }));
 }

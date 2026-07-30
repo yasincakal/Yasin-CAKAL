@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import os from "os";
 import type { AppSession, DbConfig } from "./types";
 
 /**
@@ -13,8 +12,7 @@ function resolveDataDir() {
       process.env.PROGRAMDATA || path.join("C:", "ProgramData");
     return path.join(programData, "RaporlamaWeb");
   }
-  const fallback = path.join(process.cwd(), "data");
-  return fallback;
+  return path.join(process.cwd(), "data");
 }
 
 const DATA_DIR = resolveDataDir();
@@ -74,6 +72,3 @@ export function formatFirma(firmaNr: string) {
 export function formatDonem(donemNr: string) {
   return donemNr.padStart(2, "0");
 }
-
-// keep os import used for clarity on platform checks in future
-void os;

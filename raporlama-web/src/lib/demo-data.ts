@@ -8,6 +8,17 @@ export const demoPeriods = [
   { NR: 1, BEGDATE: "2026-01-01", ENDDATE: "2026-12-31" },
 ];
 
+export const demoFirmPeriods = [
+  {
+    firmaAdi: "ERYAP MOBİLYA AŞ",
+    database: "LOGODB",
+    firmaNr: "328",
+    donemNr: "01",
+    donemBaslangic: "2026-01-01",
+    donemBitis: "2026-12-31",
+  },
+];
+
 export function demoDashboard(): DashboardSummary {
   return {
     toplamSatis: 114_653_557.21,

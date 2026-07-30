@@ -12,6 +12,7 @@ export type FirmPeriod = {
   firmaNr: string;
   firmaAdi: string;
   donemNr: string;
+  database: string;
   donemBaslangic?: string;
   donemBitis?: string;
 };
@@ -20,9 +21,19 @@ export type AppSession = {
   firmaNr: string;
   firmaAdi: string;
   donemNr: string;
+  database?: string;
   startDate: string;
   endDate: string;
   demoMode?: boolean;
+};
+
+export type LogoFirmPeriodRow = {
+  "Firma Adı": string;
+  Database: string;
+  "Firma No": string;
+  "Dönem No": string;
+  "Başlangıç Tarihi": Date | string;
+  "Bitiş Tarihi": Date | string;
 };
 
 export type ConnectionTestResult = {

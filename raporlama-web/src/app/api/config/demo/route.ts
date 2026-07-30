@@ -17,7 +17,8 @@ export async function POST() {
   saveSession({
     firmaNr: "328",
     firmaAdi: "ERYAP MOBİLYA AŞ",
-    donemNr: "1",
+    donemNr: "01",
+    database: "LOGODB",
     startDate: `${year}-01-01`,
     endDate: new Date().toISOString().slice(0, 10),
     demoMode: true,
