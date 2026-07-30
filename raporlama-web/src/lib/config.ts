@@ -1,8 +1,23 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 import type { AppSession, DbConfig } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+/**
+ * Windows PC: C:\ProgramData\RaporlamaWeb
+ * Diğer: proje/data
+ */
+function resolveDataDir() {
+  if (process.platform === "win32") {
+    const programData =
+      process.env.PROGRAMDATA || path.join("C:", "ProgramData");
+    return path.join(programData, "RaporlamaWeb");
+  }
+  const fallback = path.join(process.cwd(), "data");
+  return fallback;
+}
+
+const DATA_DIR = resolveDataDir();
 const DB_FILE = path.join(DATA_DIR, "db-config.json");
 const SESSION_FILE = path.join(DATA_DIR, "session.json");
 
@@ -10,6 +25,10 @@ function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
+}
+
+export function getDataDir() {
+  return DATA_DIR;
 }
 
 export function loadDbConfig(): DbConfig | null {
@@ -55,3 +74,6 @@ export function formatFirma(firmaNr: string) {
 export function formatDonem(donemNr: string) {
   return donemNr.padStart(2, "0");
 }
+
+// keep os import used for clarity on platform checks in future
+void os;

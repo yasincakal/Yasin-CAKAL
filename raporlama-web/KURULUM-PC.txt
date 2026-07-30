@@ -1,0 +1,34 @@
+Raporlama Programı — Windows PC Kurulumu
+========================================
+
+Bu proje senin PC'nde çalışır. Dosyalar GitHub'da; bilgisayara indirmen gerekir.
+
+1) ZIP ile indir (en kolay)
+---------------------------
+Tarayıcıda şu adresi aç:
+
+https://github.com/yasincakal/Yasin-CAKAL/archive/refs/heads/cursor/raporlama-web-e0d0.zip
+
+İndirilen ZIP'i aç (örnek):
+  C:\Users\pc34\Desktop\Yasin-CAKAL-cursor-raporlama-web-e0d0\
+
+İçindeki "raporlama-web" klasörünü şuraya kopyala:
+  C:\Users\pc34\raporlama-web\
+
+2) Node.js kur (bir kez)
+------------------------
+https://nodejs.org  →  LTS sürümünü kur
+
+3) Kurulum
+----------
+C:\Users\pc34\raporlama-web\KURULUM.bat  dosyasına çift tıkla
+
+4) Çalıştır
+-----------
+C:\Users\pc34\raporlama-web\BASLAT.bat  dosyasına çift tıkla
+
+Tarayıcı otomatik açılır: http://localhost:3000
+SQL yoksa ekranda "Demo ile Devam" de.
+
+Bağlantı ayarları Windows'ta şurada saklanır:
+  C:\ProgramData\RaporlamaWeb\

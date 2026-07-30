@@ -1,25 +1,21 @@
-# Raporlama Programı (Web)
+# Raporlama Programı (Web) — Windows PC
 
-Logo Tiger ERP raporlarını Excel makroları yerine web üzerinden sunan ayrı bir proje.
+Logo Tiger ERP raporlarını Excel yerine PC’de web arayüzle gösteren ayrı proje.
 
-## Özellikler
+## PC’de kurulum (Windows)
 
-- Veritabanı bağlantı ayarları (kalıcı kayıt)
-- Firma / dönem seçimi
-- Eksik `BAYRAK_{firma}_{donem}_*` view'larını otomatik oluşturma
-- Global tarih aralığı + **Raporları Güncelle**
-- Dashboard (satış, kar, banka, kredi, negatif stok)
-- Raporlar:
-  - A-1 Yönetim Karlılık
-  - A-2 Banka Rapor
-  - A-3 Banka Kredi
-  - B-1 Fatura Karlılık Detay
-  - B-2 Hizmet Gideri
-  - B-3 Personel Gideri
-  - C-2 Negatif Stok
-- SQL Server yoksa **Demo ile Devam**
+1. ZIP indir:  
+   https://github.com/yasincakal/Yasin-CAKAL/archive/refs/heads/cursor/raporlama-web-e0d0.zip
+2. Açıp içindeki `raporlama-web` klasörünü örn. `C:\Users\pc34\raporlama-web` yap
+3. [Node.js LTS](https://nodejs.org) kur
+4. `KURULUM.bat` → sonra `BASLAT.bat`
 
-## Çalıştırma
+Tarayıcı: http://localhost:3000  
+Ayar dosyası: `C:\ProgramData\RaporlamaWeb\`
+
+Detay: `KURULUM-PC.txt`
+
+## Geliştirici
 
 ```bash
 cd raporlama-web
@@ -27,21 +23,6 @@ npm install
 npm run dev
 ```
 
-Tarayıcı: http://localhost:3000
-
-## Üretim
-
-```bash
-npm run build
-npm start
-```
-
-## Yapılandırma
-
-Bağlantı bilgileri `data/db-config.json`, aktif oturum `data/session.json` dosyalarına yazılır.
-
-View şablonları: `sql/views/*.sql` (`{{FIRMA}}` / `{{DONEM}}` yer tutucuları).
-
 ## Not
 
-Bu uygulama cari hesap web’den bağımsızdır; yalnızca raporlama içindir.
+Cari hesap web’den bağımsızdır; yalnızca raporlama içindir.
