@@ -5,30 +5,95 @@ import { loadDbConfig } from "./config";
 let pool: sql.ConnectionPool | null = null;
 let poolKey = "";
 
+/** DESKTOP-97B4PJQ\SQL2025 veya DESKTOP-97B4PJQ,1433 ayrıştırır */
+export function parseServerAddress(raw: string, port?: number) {
+  const input = raw.trim().replace(/\//g, "\\");
+  let host = input;
+  let instanceName: string | undefined;
+  let resolvedPort = port && port > 0 ? port : undefined;
+
+  // host,port
+  const comma = input.match(/^([^\\,]+)\s*,\s*(\d+)\s*$/);
+  if (comma) {
+    host = comma[1].trim();
+    resolvedPort = Number(comma[2]);
+  } else {
+    // host\instance
+    const slash = input.indexOf("\\");
+    if (slash > 0) {
+      host = input.slice(0, slash).trim();
+      instanceName = input.slice(slash + 1).trim() || undefined;
+    }
+  }
+
+  return { host, instanceName, port: resolvedPort };
+}
+
+function friendlySqlError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/Port for .+ not found/i.test(msg)) {
+    return (
+      `${msg}\n\n` +
+      "Named instance portu bulunamadı (SQL Browser).\n" +
+      "Çözüm:\n" +
+      "1) Port alanına instance portunu yazın (örn. 1433) ve sunucuyu sadece DESKTOP-97B4PJQ olarak girin\n" +
+      "   veya DESKTOP-97B4PJQ,PORT yazın\n" +
+      "2) Windows'ta SQL Server Browser servisini başlatın\n" +
+      "3) SQL Server Configuration Manager → TCP/IP Enabled + portu not edin"
+    );
+  }
+  if (/Failed to connect|ELOGIN|Login failed/i.test(msg)) {
+    return `${msg}\n\nKullanıcı/şifre veya SQL Authentication ayarını kontrol edin.`;
+  }
+  if (/timeout|ETIMEOUT|Bağlantı zaman aşımı/i.test(msg)) {
+    return `${msg}\n\nSunucu adı, port veya firewall (TCP) ayarını kontrol edin.`;
+  }
+  return msg;
+}
+
 function buildConfig(cfg: DbConfig): sql.config {
-  return {
-    server: cfg.server,
+  const { host, instanceName, port } = parseServerAddress(cfg.server, cfg.port);
+  const connectTimeout = 15000;
+
+  const options: sql.config["options"] = {
+    encrypt: cfg.encrypt ?? false,
+    trustServerCertificate: cfg.trustServerCertificate ?? true,
+    enableArithAbort: true,
+    connectTimeout,
+    requestTimeout: 120000,
+  };
+
+  // Port varsa Browser'a ihtiyaç yok; instanceName gönderme
+  if (port) {
+    // explicit port
+  } else if (instanceName) {
+    options.instanceName = instanceName;
+  }
+
+  const config: sql.config = {
+    server: host,
     database: cfg.database,
     user: cfg.windowsAuth ? undefined : cfg.user,
     password: cfg.windowsAuth ? undefined : cfg.password,
-    options: {
-      encrypt: cfg.encrypt ?? false,
-      trustServerCertificate: cfg.trustServerCertificate ?? true,
-      enableArithAbort: true,
-      connectTimeout: 2000,
-      requestTimeout: 120000,
-    },
+    options,
     pool: {
       max: 10,
       min: 0,
       idleTimeoutMillis: 30000,
     },
-    connectionTimeout: 2000,
+    connectionTimeout: connectTimeout,
   };
+
+  if (port) {
+    config.port = port;
+  }
+
+  return config;
 }
 
 function keyOf(cfg: DbConfig) {
-  return `${cfg.server}|${cfg.database}|${cfg.user}|${cfg.windowsAuth ? "win" : "sql"}`;
+  const parsed = parseServerAddress(cfg.server, cfg.port);
+  return `${parsed.host}|${parsed.instanceName || ""}|${parsed.port || ""}|${cfg.database}|${cfg.user}|${cfg.windowsAuth ? "win" : "sql"}`;
 }
 
 export async function getPool(cfg?: DbConfig | null): Promise<sql.ConnectionPool> {
@@ -58,22 +123,18 @@ export async function testConnection(cfg: DbConfig): Promise<ConnectionTestResul
   let temp: sql.ConnectionPool | null = null;
   try {
     temp = new sql.ConnectionPool(buildConfig(cfg));
-    await Promise.race([
-      temp.connect(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Bağlantı zaman aşımı (2 sn)")), 2000)
-      ),
-    ]);
+    await temp.connect();
     await temp.request().query("SELECT 1 AS ok");
+    const parsed = parseServerAddress(cfg.server, cfg.port);
     return {
       ok: true,
-      message: "Bağlantı başarılı",
+      message: `Bağlantı başarılı (${parsed.host}${parsed.port ? "," + parsed.port : parsed.instanceName ? "\\" + parsed.instanceName : ""})`,
       latencyMs: Date.now() - started,
     };
   } catch (err) {
     return {
       ok: false,
-      message: err instanceof Error ? err.message : "Bağlantı başarısız",
+      message: friendlySqlError(err),
       latencyMs: Date.now() - started,
     };
   } finally {

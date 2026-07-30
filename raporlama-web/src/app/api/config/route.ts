@@ -13,6 +13,7 @@ export async function GET() {
     config: cfg
       ? {
           server: cfg.server,
+          port: cfg.port,
           database: cfg.database,
           user: cfg.user,
           password: cfg.password ? "********" : "",
@@ -27,15 +28,29 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = (await req.json()) as DbConfig & { action?: string };
+  const port =
+    typeof body.port === "number"
+      ? body.port
+      : body.port
+        ? Number(body.port)
+        : undefined;
+
   const cfg: DbConfig = {
-    server: body.server?.trim(),
-    database: body.database?.trim(),
+    server: String(body.server ?? "").trim(),
+    database: String(body.database ?? "").trim(),
     user: body.user?.trim() ?? "",
     password: body.password ?? "",
+    port: port && !Number.isNaN(port) && port > 0 ? port : undefined,
     encrypt: Boolean(body.encrypt),
     trustServerCertificate: body.trustServerCertificate !== false,
     windowsAuth: Boolean(body.windowsAuth),
   };
+
+  // Kayıtlı şifreyi koru (UI maskeli gönderirse)
+  const existing = loadDbConfig();
+  if ((!cfg.password || cfg.password === "********") && existing?.password) {
+    cfg.password = existing.password;
+  }
 
   if (!cfg.server || !cfg.database) {
     return NextResponse.json(

@@ -6,6 +6,7 @@ import { useApp } from "@/context/app-context";
 
 type FormState = {
   server: string;
+  port: string;
   database: string;
   user: string;
   password: string;
@@ -16,6 +17,7 @@ type FormState = {
 
 const empty: FormState = {
   server: "",
+  port: "",
   database: "",
   user: "",
   password: "",
@@ -38,6 +40,7 @@ export default function AyarlarPage() {
       if (data.config) {
         setForm({
           server: data.config.server || "",
+          port: data.config.port ? String(data.config.port) : "",
           database: data.config.database || "",
           user: data.config.user || "",
           password: "",
@@ -49,6 +52,14 @@ export default function AyarlarPage() {
     })();
   }, []);
 
+  function payload() {
+    const portNum = form.port.trim() ? Number(form.port.trim()) : undefined;
+    return {
+      ...form,
+      port: portNum && !Number.isNaN(portNum) ? portNum : undefined,
+    };
+  }
+
   async function submit(action: "test" | "save") {
     setBusy(true);
     setMessage("");
@@ -56,7 +67,7 @@ export default function AyarlarPage() {
       const res = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, action }),
+        body: JSON.stringify({ ...payload(), action }),
       });
       const data = await res.json();
       setMessage(data.message || (res.ok ? "Tamam" : "Hata"));
@@ -88,22 +99,40 @@ export default function AyarlarPage() {
   }
 
   return (
-    <div className="setup-card">
+    <div className="setup-card wide">
       <div className="brand-sub">İlk açılış</div>
       <h1>Veritabanı Bağlantısı</h1>
       <p className="lead">
-        SQL Server bilgilerini bir kez kaydedin. Program açılışta otomatik bağlanır;
-        bağlantı kurulamazsa bu ekran tekrar gösterilir.
+        SQL Server bilgilerini bir kez kaydedin. Named instance için
+        (<code>DESKTOP-97B4PJQ\SQL2025</code>) port bulunamazsa aşağıdaki{" "}
+        <strong>Port</strong> alanını doldurun.
       </p>
 
-      <label className="field">
-        <span>SQL Server Adı / IP</span>
-        <input
-          value={form.server}
-          onChange={(e) => setForm({ ...form, server: e.target.value })}
-          placeholder="172.17.45.2 veya SUNUCU\\INSTANCE"
-        />
-      </label>
+      <div className="field-row">
+        <label className="field">
+          <span>SQL Server Adı / IP</span>
+          <input
+            value={form.server}
+            onChange={(e) => setForm({ ...form, server: e.target.value })}
+            placeholder="DESKTOP-97B4PJQ veya DESKTOP-97B4PJQ\SQL2025"
+          />
+        </label>
+        <label className="field">
+          <span>Port (önerilir)</span>
+          <input
+            value={form.port}
+            onChange={(e) => setForm({ ...form, port: e.target.value.replace(/[^\d]/g, "") })}
+            placeholder="örn. 1433"
+            inputMode="numeric"
+          />
+        </label>
+      </div>
+
+      <p className="muted" style={{ marginTop: -6, marginBottom: 14, whiteSpace: "pre-line" }}>
+        {`Port için: SQL Server Configuration Manager → SQL2025 → TCP/IP → IP Addresses → TCP Port
+veya sunucuyu şöyle yazın: DESKTOP-97B4PJQ,1433`}
+      </p>
+
       <label className="field">
         <span>Veritabanı Adı</span>
         <input
@@ -161,7 +190,14 @@ export default function AyarlarPage() {
         </label>
       </div>
 
-      {message && <div className={message.toLowerCase().includes("başar") ? "muted" : "error-box"} style={{ borderRadius: 12, marginBottom: 12 }}>{message}</div>}
+      {message && (
+        <div
+          className={message.toLowerCase().includes("başar") ? "muted" : "error-box"}
+          style={{ borderRadius: 12, marginBottom: 12, whiteSpace: "pre-wrap" }}
+        >
+          {message}
+        </div>
+      )}
 
       <div className="actions">
         <button className="btn btn-ghost" disabled={busy} onClick={() => void submit("test")}>

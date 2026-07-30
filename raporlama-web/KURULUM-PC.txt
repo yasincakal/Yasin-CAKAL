@@ -32,3 +32,23 @@ SQL yoksa ekranda "Demo ile Devam" de.
 
 Bağlantı ayarları Windows'ta şurada saklanır:
   C:\ProgramData\RaporlamaWeb\
+
+SQL bağlantı hatası: "Port for SQL2025 not found"
+-------------------------------------------------
+Named instance portu bulunamıyor demektir.
+
+Ayarlar ekranında:
+  Server : DESKTOP-97B4PJQ
+  Port   : (Configuration Manager'daki TCP Port, örn. 1433)
+
+veya Server alanına: DESKTOP-97B4PJQ,1433
+
+Port bulmak için:
+  SQL Server Configuration Manager
+  → SQL Server Network Configuration
+  → Protocols for SQL2025
+  → TCP/IP → Enabled
+  → IP Addresses → TCP Port / TCP Dynamic Ports
+
+Ayrıca Windows Services'te "SQL Server Browser" çalışıyor olmalı
+(port yazıyorsanız Browser şart değil).

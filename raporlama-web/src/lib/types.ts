@@ -3,6 +3,8 @@ export type DbConfig = {
   database: string;
   user: string;
   password: string;
+  /** Named instance port (SQL Browser yoksa zorunlu), örn. 1433 */
+  port?: number;
   encrypt?: boolean;
   trustServerCertificate?: boolean;
   windowsAuth?: boolean;
