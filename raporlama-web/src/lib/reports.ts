@@ -52,10 +52,17 @@ async function ensureLiveViews() {
   const s = sessionOrThrow();
   if (s.demoMode) return;
   const statuses = await ensureViews(s.firmaNr, s.donemNr, { force: false });
-  const failed = statuses.filter((x) => !x.exists);
+  const failed = statuses.filter(
+    (x) =>
+      x.name.startsWith("BAYRAK_") &&
+      !x.exists &&
+      (x.name.includes("FATURARAPOR") ||
+        x.name.includes("HIZMETRAPOR") ||
+        x.name.includes("MUHASEBERAPOR"))
+  );
   if (failed.length) {
     throw new Error(
-      `Eksik/hatalı view'lar: ${failed.map((f) => `${f.name}${f.error ? ` (${f.error})` : ""}`).join("; ")}`
+      `Kritik view eksik: ${failed.map((f) => `${f.name}${f.error ? ` (${f.error})` : ""}`).join("; ")}`
     );
   }
 }

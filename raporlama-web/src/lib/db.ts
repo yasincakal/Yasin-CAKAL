@@ -163,6 +163,33 @@ export async function queryRows<T extends Record<string, unknown> = Record<strin
   return result.recordset;
 }
 
+export function sqlErrorMessage(err: unknown): string {
+  if (!err) return "Bilinmeyen SQL hatası";
+  const e = err as {
+    message?: string;
+    number?: number;
+    code?: string;
+    precedingErrors?: Array<{ message?: string }>;
+    originalError?: { info?: { message?: string; number?: number }; message?: string };
+  };
+  const parts: string[] = [];
+  const main =
+    e.originalError?.info?.message ||
+    e.originalError?.message ||
+    e.message ||
+    String(err);
+  parts.push(main);
+  if (e.number || e.originalError?.info?.number) {
+    parts.push(`(SQL #${e.number || e.originalError?.info?.number})`);
+  }
+  if (e.precedingErrors?.length) {
+    for (const p of e.precedingErrors) {
+      if (p.message) parts.push(p.message);
+    }
+  }
+  return parts.filter(Boolean).join(" — ");
+}
+
 export async function executeBatches(sqlText: string) {
   const p = await getPool();
   const batches = sqlText
@@ -170,7 +197,20 @@ export async function executeBatches(sqlText: string) {
     .map((b) => b.trim())
     .filter(Boolean);
   for (const batch of batches) {
-    await p.request().batch(batch);
+    try {
+      // CREATE VIEW için batch(); tek statement'ta query de denenir
+      if (/^\s*CREATE\s+(VIEW|PROC|PROCEDURE)/i.test(batch)) {
+        await p.request().batch(batch);
+      } else {
+        try {
+          await p.request().batch(batch);
+        } catch {
+          await p.request().query(batch);
+        }
+      }
+    } catch (err) {
+      throw new Error(sqlErrorMessage(err));
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { executeBatches, getPool } from "./db";
+import { executeBatches, getPool, sqlErrorMessage } from "./db";
 import { formatDonem, formatFirma } from "./config";
 import type { ViewStatus } from "./types";
 
@@ -14,6 +14,13 @@ export const REQUIRED_VIEWS = [
 ] as const;
 
 export type RequiredView = (typeof REQUIRED_VIEWS)[number];
+
+/** Raporlar için kritik view'lar — bunlar olmadan canlı veri çalışmaz */
+export const CRITICAL_VIEWS: RequiredView[] = [
+  "FATURARAPOR",
+  "HIZMETRAPOR",
+  "MUHASEBERAPOR",
+];
 
 function templatePath(name: string) {
   return path.join(process.cwd(), "sql", "views", `${name}.sql`);
@@ -44,6 +51,40 @@ export async function checkViewExists(firmaNr: string, donemNr: string, suffix: 
   return (result.recordset[0]?.cnt ?? 0) > 0;
 }
 
+export async function preflightTables(firmaNr: string, donemNr: string) {
+  const firma = formatFirma(firmaNr);
+  const donem = formatDonem(donemNr);
+  const pool = await getPool();
+  const dbRes = await pool.request().query<{ db: string }>(`SELECT DB_NAME() AS db`);
+  const database = dbRes.recordset[0]?.db ?? "";
+
+  const needed = [
+    `LG_${firma}_${donem}_STLINE`,
+    `LG_${firma}_${donem}_INVOICE`,
+    `LG_${firma}_${donem}_EMFLINE`,
+    `LG_${firma}_CLCARD`,
+    `LG_${firma}_ITEMS`,
+    `L_CAPIFIRM`,
+    `L_CAPIPERIOD`,
+    `L_CAPIDIV`,
+  ];
+
+  const missing: string[] = [];
+  const present: string[] = [];
+  for (const table of needed) {
+    const r = await pool
+      .request()
+      .input("obj", table)
+      .query<{ cnt: number }>(
+        `SELECT COUNT(*) AS cnt FROM sys.objects WHERE name = @obj AND type IN ('U','V')`
+      );
+    if ((r.recordset[0]?.cnt ?? 0) > 0) present.push(table);
+    else missing.push(table);
+  }
+
+  return { database, firma, donem, present, missing };
+}
+
 export async function ensureViews(
   firmaNr: string,
   donemNr: string,
@@ -51,6 +92,41 @@ export async function ensureViews(
 ): Promise<ViewStatus[]> {
   const force = Boolean(opts?.force);
   const statuses: ViewStatus[] = [];
+
+  // Ön kontrol: yanlış DB / eksik Logo tabloları
+  try {
+    const pre = await preflightTables(firmaNr, donemNr);
+    if (pre.missing.length) {
+      statuses.push({
+        name: `ÖN_KONTROL`,
+        exists: false,
+        error:
+          `Aktif DB: ${pre.database}. Eksik Logo tabloları: ${pre.missing.join(", ")}. ` +
+          `Bağlantı ayarındaki veritabanı adını / firma-dönem bilgisini kontrol edin.`,
+      });
+      // Kritik tablolar yoksa view oluşturmaya devam etme
+      if (
+        pre.missing.some((t) => t.includes("_STLINE") || t.includes("_INVOICE") || t === "L_CAPIFIRM")
+      ) {
+        for (const suffix of REQUIRED_VIEWS) {
+          const name = `BAYRAK_${formatFirma(firmaNr)}_${formatDonem(donemNr)}_${suffix}`;
+          statuses.push({
+            name,
+            exists: false,
+            error: "Ön kontrol başarısız — Logo tabloları bulunamadı",
+          });
+        }
+        return statuses;
+      }
+    }
+  } catch (err) {
+    statuses.push({
+      name: "ÖN_KONTROL",
+      exists: false,
+      error: sqlErrorMessage(err),
+    });
+  }
+
   for (const suffix of REQUIRED_VIEWS) {
     const name = `BAYRAK_${formatFirma(firmaNr)}_${formatDonem(donemNr)}_${suffix}`;
     try {
@@ -61,17 +137,21 @@ export async function ensureViews(
       }
       const sqlText = renderViewSql(suffix, firmaNr, donemNr);
       await executeBatches(sqlText);
+      const ok = await checkViewExists(firmaNr, donemNr, suffix);
+      if (!ok) {
+        throw new Error("CREATE çalıştı ama view sys.views içinde görünmüyor");
+      }
       statuses.push({ name, exists: true, created: true });
     } catch (err) {
       statuses.push({
         name,
         exists: false,
-        error: err instanceof Error ? err.message : "View oluşturulamadı",
+        error: sqlErrorMessage(err),
       });
     }
   }
 
-  // Optional stored proc for email negative stock
+  // Optional stored proc — hata rapor akışını bozmasın
   try {
     const procName = `BAYRAK_${formatFirma(firmaNr)}_${formatDonem(donemNr)}_STOKNEGATIF`;
     const pool = await getPool();
@@ -82,10 +162,16 @@ export async function ensureViews(
         `SELECT COUNT(*) AS cnt FROM sys.procedures WHERE name = @name`
       );
     if ((exists.recordset[0]?.cnt ?? 0) === 0 || force) {
-      await executeBatches(renderViewSql("STOKNEGATIF_PROC", firmaNr, donemNr));
+      // email_table yoksa proc oluşturmayı atla
+      const emailFn = await pool.request().query<{ cnt: number }>(
+        `SELECT COUNT(*) AS cnt FROM sys.objects WHERE name = 'email_table'`
+      );
+      if ((emailFn.recordset[0]?.cnt ?? 0) > 0) {
+        await executeBatches(renderViewSql("STOKNEGATIF_PROC", firmaNr, donemNr));
+      }
     }
   } catch {
-    /* proc is optional */
+    /* proc optional */
   }
 
   return statuses;
@@ -103,7 +189,7 @@ export async function listFirmPeriods() {
   }>(`
 SELECT
   CAPIFIRM.NAME AS [Firma Adı],
-  CASE WHEN CAPIFIRM.DBNAME='' THEN DB_NAME() ELSE CAPIFIRM.DBNAME END AS [Database],
+  CASE WHEN ISNULL(CAPIFIRM.DBNAME,'')='' THEN DB_NAME() ELSE CAPIFIRM.DBNAME END AS [Database],
   RIGHT('000'+CAST(CAPIFIRM.NR AS nvarchar(5)),3) AS [Firma No],
   RIGHT('000'+CAST(CAPIPERIOD.NR AS nvarchar(5)),2) AS [Dönem No],
   CAPIPERIOD.BEGDATE AS [Başlangıç Tarihi],

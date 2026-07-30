@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadSession } from "@/lib/config";
-import { ensureViews, REQUIRED_VIEWS } from "@/lib/views";
+import { CRITICAL_VIEWS, ensureViews, REQUIRED_VIEWS } from "@/lib/views";
+import { formatDonem, formatFirma } from "@/lib/config";
 
 export const runtime = "nodejs";
 
@@ -12,13 +13,13 @@ export async function GET() {
   if (session.demoMode) {
     return NextResponse.json({ ok: true, demo: true, required: REQUIRED_VIEWS });
   }
+  const firma = formatFirma(session.firmaNr);
+  const donem = formatDonem(session.donemNr);
   return NextResponse.json({
     ok: true,
-    firmaNr: session.firmaNr,
-    donemNr: session.donemNr,
-    required: REQUIRED_VIEWS.map(
-      (s) => `BAYRAK_${session.firmaNr.padStart(3, "0")}_${session.donemNr.padStart(2, "0")}_${s}`
-    ),
+    firmaNr: firma,
+    donemNr: donem,
+    required: REQUIRED_VIEWS.map((s) => `BAYRAK_${firma}_${donem}_${s}`),
   });
 }
 
@@ -49,19 +50,46 @@ export async function POST(req: Request) {
 
   try {
     const statuses = await ensureViews(session.firmaNr, session.donemNr, { force });
-    const ok = statuses.every((s) => s.exists);
-    const created = statuses.filter((s) => s.created).map((s) => s.name);
-    const failed = statuses.filter((s) => !s.exists);
+    const viewStatuses = statuses.filter((s) => s.name.startsWith("BAYRAK_"));
+    const pre = statuses.find((s) => s.name === "ÖN_KONTROL" && !s.exists);
+
+    const criticalOk = CRITICAL_VIEWS.every((suffix) =>
+      viewStatuses.some(
+        (s) =>
+          s.exists &&
+          s.name.endsWith(`_${suffix}`)
+      )
+    );
+    const created = viewStatuses.filter((s) => s.created).map((s) => s.name);
+    const failed = viewStatuses.filter((s) => !s.exists);
+    const ok = criticalOk;
+
+    let message = "";
+    if (pre) {
+      message = pre.error || "Ön kontrol başarısız";
+    } else if (ok && failed.length === 0) {
+      message = created.length
+        ? `${created.length} view oluşturuldu/yenilendi. Canlı veriye geçilebilir.`
+        : "Tüm view'lar hazır.";
+    } else if (ok && failed.length) {
+      message =
+        `Kritik view'lar hazır. Bazı ek view'lar başarısız (raporlar kısmi çalışır): ` +
+        failed.map((f) => `${f.name}: ${f.error || "?"}`).join(" | ");
+    } else {
+      message =
+        `View oluşturulamadı.\n` +
+        failed
+          .map((f) => `• ${f.name}\n  ${f.error || "bilinmeyen hata"}`)
+          .join("\n");
+    }
+
     return NextResponse.json({
       ok,
       statuses,
       created,
       failed,
-      message: ok
-        ? created.length
-          ? `${created.length} view oluşturuldu/yenilendi.`
-          : "Tüm view'lar hazır."
-        : `Bazı view'lar başarısız: ${failed.map((f) => f.name).join(", ")}`,
+      criticalOk,
+      message,
     });
   } catch (err) {
     return NextResponse.json(

@@ -111,13 +111,15 @@ export default function FirmaClient() {
         const viewData = await views.json();
         const lines = (viewData.statuses || []).map(
           (s: { name: string; exists: boolean; created?: boolean; error?: string }) =>
-            `${s.exists ? "✓" : "✗"} ${s.name}${s.created ? " (oluşturuldu)" : ""}${s.error ? ` — ${s.error}` : ""}`
+            `${s.exists ? "✓" : "✗"} ${s.name}${s.created ? " (oluşturuldu)" : ""}${
+              s.error ? `\n    → ${s.error}` : ""
+            }`
         );
         setViewLog(lines);
         if (!views.ok || !viewData.ok) {
           setMessage(
             viewData.message ||
-              "View oluşturulamadı. Dashboard'a geçilmedi — hatayı düzeltip tekrar deneyin."
+              "View oluşturulamadı. Aşağıdaki SQL hatalarını kontrol edin."
           );
           setBusy(false);
           return;
