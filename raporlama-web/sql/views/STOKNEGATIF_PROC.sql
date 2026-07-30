@@ -1,0 +1,4 @@
+IF OBJECT_ID(N'[dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_STOKNEGATIF]', N'P') IS NOT NULL DROP PROCEDURE [dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_STOKNEGATIF];
+GO
+CREATE PROC [dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_STOKNEGATIF]           as             If(OBJECT_ID('tempdb..#KONTROL') Is Not Null)  Begin      Drop Table #KONTROL  End      select  [Stok Kodu], [Stok Adı], [Ambar Adı], [Ambar No], [Ambar Grup], [Fiş Türü], [Fiş No], [Fatura No],   CONVERT(NVARCHAR(11),[Tarih],104) [Tarih], [Ana Miktar], [Tutar], [Kalan Miktar], [Maliyet]     INTO #KONTROL   from   BAYRAK_{{FIRMA}}_{{DONEM}}_STOK_NEGATIF    where Negatif=-1    ORDER BY [Stok Kodu],[Stok Adı]               CREATE CLUSTERED INDEX CCC1 ON #KONTROL([Stok Kodu])           IF (SELECT COUNT(*) FROM #KONTROL)>0   BEGIN        EXEC [dbo].[email_table]    @tablename  = '#KONTROL'   ,@recipients = 'muhasebe2@yaprakgroup.com;muhasebe1@yaprakgroup.com'   ,@subject    = 'Stok Negatif Listesi'     END
+GO
