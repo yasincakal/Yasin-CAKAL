@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const { session, refreshing } = useApp();
   const router = useRouter();
   const [data, setData] = useState<DashboardSummary | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!session) {
@@ -29,9 +30,16 @@ export default function DashboardPage() {
     }
     let cancelled = false;
     void (async () => {
+      setError("");
       const res = await fetch("/api/reports?type=dashboard");
       const json = await res.json();
-      if (!cancelled && res.ok) setData(json);
+      if (cancelled) return;
+      if (!res.ok) {
+        setError(json.message || "Dashboard canlı verisi alınamadı");
+        setData(null);
+        return;
+      }
+      setData(json);
     })();
     return () => {
       cancelled = true;
@@ -42,8 +50,23 @@ export default function DashboardPage() {
     <div className="page">
       <TopBar
         title="Dashboard"
-        subtitle="Firma ve tarih aralığına göre yönetim özeti"
+        subtitle={
+          session?.demoMode
+            ? "Demo veri (statik)"
+            : `Canlı SQL · Firma ${session?.firmaNr}/${session?.donemNr}${session?.database ? ` · ${session.database}` : ""}`
+        }
       />
+
+      {error && (
+        <div className="error-box" style={{ borderRadius: 14, marginBottom: 16, whiteSpace: "pre-wrap" }}>
+          {error}
+          <div style={{ marginTop: 10 }}>
+            <button className="btn btn-secondary" onClick={() => router.push("/firma")}>
+              Firma / View ekranına dön
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="stats-grid">
         <StatCard label="Toplam Satış" value={data?.toplamSatis ?? 0} tone="accent" />

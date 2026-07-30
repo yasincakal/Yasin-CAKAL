@@ -8,17 +8,27 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const cfg = loadDbConfig();
+  if (!cfg || cfg.server === "demo.local") {
+    return NextResponse.json({ firms: demoFirmPeriods, source: "demo" });
+  }
   try {
-    if (!cfg || cfg.server === "demo.local") throw new Error("demo");
     const firms = await listFirmPeriods();
     return NextResponse.json({ firms, source: "sql" });
-  } catch {
-    return NextResponse.json({ firms: demoFirmPeriods, source: "demo" });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        firms: [],
+        source: "sql",
+        error: err instanceof Error ? err.message : "Firma listesi alınamadı",
+      },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: Request) {
   const body = await req.json();
+  const cfg = loadDbConfig();
   const firmaNr = String(body.firmaNr ?? "").padStart(3, "0");
   const donemNr = String(body.donemNr ?? "1").padStart(2, "0");
   const firmaAdi = String(body.firmaAdi ?? "");
@@ -29,14 +39,15 @@ export async function POST(req: Request) {
   const endDate = String(
     body.endDate ?? body.donemBitis ?? new Date().toISOString().slice(0, 10)
   );
-  const demoMode = Boolean(body.demoMode);
+
+  // Canlı SQL config varken demoMode zorla kapalı
+  const isDemoConfig = !cfg || cfg.server === "demo.local";
+  const demoMode = isDemoConfig ? true : false;
 
   if (!firmaNr || firmaNr === "000") {
     return NextResponse.json({ ok: false, message: "Firma seçiniz." }, { status: 400 });
   }
 
-  // Logo CAPIFIRM.DBNAME farklıysa bağlantı veritabanını güncelle
-  const cfg = loadDbConfig();
   if (!demoMode && cfg && database && database !== cfg.database) {
     saveDbConfig({ ...cfg, database });
     await closePool();
@@ -52,5 +63,5 @@ export async function POST(req: Request) {
     demoMode,
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, demoMode });
 }

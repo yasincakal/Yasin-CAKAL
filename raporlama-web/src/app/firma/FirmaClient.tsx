@@ -29,6 +29,7 @@ export default function FirmaClient() {
   const [source, setSource] = useState("sql");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [viewLog, setViewLog] = useState<string[]>([]);
   const demoPreferred = params.get("demo") === "1";
 
   const selected = useMemo(
@@ -36,10 +37,18 @@ export default function FirmaClient() {
     [items, selectedKey]
   );
 
+  const isLive = !demoPreferred && source === "sql";
+
   useEffect(() => {
     void (async () => {
       const res = await fetch("/api/firmalar");
       const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error || "Firma listesi alınamadı (canlı SQL).");
+        setItems([]);
+        setSource("sql");
+        return;
+      }
       const list = (data.firms || []) as FirmPeriodItem[];
       setItems(list);
       setSource(data.source || "sql");
@@ -59,11 +68,22 @@ export default function FirmaClient() {
 
   async function continueNext() {
     if (!selected) return;
+
+    if (isLive) {
+      const okConfirm = window.confirm(
+        `${selected.firmaAdi}\nFirma: ${selected.firmaNr}  Dönem: ${selected.donemNr}\nDatabase: ${selected.database}\n\n` +
+          `Eksik rapor view'ları otomatik oluşturulacak / yenilenecek.\n` +
+          `BAYRAK_${selected.firmaNr}_${selected.donemNr}_*\n\nDevam edilsin mi?`
+      );
+      if (!okConfirm) return;
+    }
+
     setBusy(true);
     setMessage("");
+    setViewLog([]);
     try {
-      const demoMode = demoPreferred || source === "demo";
-      await fetch("/api/firmalar", {
+      const demoMode = !isLive;
+      const saveRes = await fetch("/api/firmalar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -78,17 +98,31 @@ export default function FirmaClient() {
           demoMode,
         }),
       });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.message || "Oturum kaydedilemedi");
 
       if (!demoMode) {
-        setMessage("View'lar kontrol ediliyor…");
-        const views = await fetch("/api/views", { method: "POST" });
+        setMessage("View'lar oluşturuluyor (canlı SQL)…");
+        const views = await fetch("/api/views", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force: true }),
+        });
         const viewData = await views.json();
+        const lines = (viewData.statuses || []).map(
+          (s: { name: string; exists: boolean; created?: boolean; error?: string }) =>
+            `${s.exists ? "✓" : "✗"} ${s.name}${s.created ? " (oluşturuldu)" : ""}${s.error ? ` — ${s.error}` : ""}`
+        );
+        setViewLog(lines);
         if (!views.ok || !viewData.ok) {
           setMessage(
             viewData.message ||
-              "Bazı view'lar oluşturulamadı. Demo moda geçebilir veya tekrar deneyebilirsiniz."
+              "View oluşturulamadı. Dashboard'a geçilmedi — hatayı düzeltip tekrar deneyin."
           );
+          setBusy(false);
+          return;
         }
+        setMessage(viewData.message || "View'lar hazır. Canlı veriye geçiliyor…");
       }
 
       await reload();
@@ -105,9 +139,8 @@ export default function FirmaClient() {
       <div className="brand-sub">Firma seçimi</div>
       <h1>Çalışılacak firma ve dönem</h1>
       <p className="lead">
-        Logo <code>L_CAPIFIRM</code> / <code>L_CAPIPERIOD</code> kayıtlarından firma no,
-        dönem no, database ve tarih aralığı çekilir. Seçim sonrası view&apos;lar otomatik
-        hazırlanır.
+        Logo firma/dönem listesinden seçim yapın. Canlı modda rapor view&apos;ları
+        onayınızla otomatik oluşturulur; demo veriye düşülmez.
       </p>
 
       <div className="firm-list">
@@ -160,10 +193,31 @@ export default function FirmaClient() {
       </div>
 
       <p className="muted" style={{ marginTop: -4 }}>
-        Kaynak: {source === "demo" || demoPreferred ? "Demo veri" : "SQL Server (Logo)"}
+        Mod:{" "}
+        <strong>{isLive ? "CANLI SQL (statik veri yok)" : "Demo veri"}</strong>
       </p>
 
-      {message && <div className="muted" style={{ marginBottom: 12 }}>{message}</div>}
+      {message && (
+        <div
+          className={message.toLowerCase().includes("hazır") || message.toLowerCase().includes("oluşturuldu") ? "muted" : "error-box"}
+          style={{ borderRadius: 12, marginBottom: 12, whiteSpace: "pre-wrap" }}
+        >
+          {message}
+        </div>
+      )}
+
+      {viewLog.length > 0 && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <div className="panel-head">
+            <h2>View durumu</h2>
+          </div>
+          <div className="panel-body" style={{ padding: 14, fontSize: "0.88rem" }}>
+            {viewLog.map((l) => (
+              <div key={l}>{l}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="actions">
         <button className="btn btn-ghost" onClick={() => router.push("/ayarlar")}>
@@ -174,7 +228,7 @@ export default function FirmaClient() {
           disabled={!selected || busy}
           onClick={() => void continueNext()}
         >
-          Devam Et
+          {busy ? "İşleniyor…" : isLive ? "View Oluştur ve Devam" : "Demo ile Devam"}
         </button>
       </div>
     </div>

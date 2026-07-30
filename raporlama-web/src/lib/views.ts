@@ -46,14 +46,16 @@ export async function checkViewExists(firmaNr: string, donemNr: string, suffix: 
 
 export async function ensureViews(
   firmaNr: string,
-  donemNr: string
+  donemNr: string,
+  opts?: { force?: boolean }
 ): Promise<ViewStatus[]> {
+  const force = Boolean(opts?.force);
   const statuses: ViewStatus[] = [];
   for (const suffix of REQUIRED_VIEWS) {
     const name = `BAYRAK_${formatFirma(firmaNr)}_${formatDonem(donemNr)}_${suffix}`;
     try {
       const exists = await checkViewExists(firmaNr, donemNr, suffix);
-      if (exists) {
+      if (exists && !force) {
         statuses.push({ name, exists: true });
         continue;
       }
@@ -79,7 +81,7 @@ export async function ensureViews(
       .query<{ cnt: number }>(
         `SELECT COUNT(*) AS cnt FROM sys.procedures WHERE name = @name`
       );
-    if ((exists.recordset[0]?.cnt ?? 0) === 0) {
+    if ((exists.recordset[0]?.cnt ?? 0) === 0 || force) {
       await executeBatches(renderViewSql("STOKNEGATIF_PROC", firmaNr, donemNr));
     }
   } catch {
