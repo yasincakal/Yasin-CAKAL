@@ -1,5 +1,7 @@
 "use client";
 
+import { apiUrl } from "@/lib/base-path";
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useApp } from "@/context/app-context";
@@ -41,7 +43,7 @@ export default function FirmaClient() {
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch("/api/firmalar");
+      const res = await fetch(apiUrl("/api/firmalar"));
       const data = await res.json();
       if (!res.ok) {
         setMessage(data.error || "Firma listesi alınamadı (canlı SQL).");
@@ -83,7 +85,7 @@ export default function FirmaClient() {
     setViewLog([]);
     try {
       const demoMode = !isLive;
-      const saveRes = await fetch("/api/firmalar", {
+      const saveRes = await fetch(apiUrl("/api/firmalar"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -103,7 +105,7 @@ export default function FirmaClient() {
 
       if (!demoMode) {
         setMessage("View'lar oluşturuluyor (canlı SQL)…");
-        const views = await fetch("/api/views", {
+        const views = await fetch(apiUrl("/api/views"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ force: true }),

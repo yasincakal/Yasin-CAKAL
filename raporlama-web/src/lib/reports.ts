@@ -78,7 +78,7 @@ export async function getDashboard(): Promise<DashboardSummary> {
   const muhasebe = v("MUHASEBERAPOR");
   const banka = v("BANKARAPOR");
   const kredi = v("KREDIRAPOR");
-  const negatif = v("STOK_NEGATIF");
+  const cari = v("CARIBAKIYELER");
 
   const karlilikSql = `
 SELECT NAME AS [isYeri],
@@ -126,9 +126,19 @@ ORDER BY NAME`;
   const krediRows = await liveQuery(
     `SELECT SUM(ISNULL([Kalan Tutar],0)) AS kalan FROM [dbo].[${kredi}] WHERE [Kalan]=N'Yürürlükte'`
   );
-  const negatifRows = await liveQuery(
-    `SELECT COUNT(*) AS adet FROM [dbo].[${negatif}] WHERE Negatif=-1`
-  );
+  const cariRows = await liveQuery(`
+SELECT
+  SUM(CASE WHEN Bakiye > 0 THEN Bakiye ELSE 0 END) AS borclu,
+  SUM(CASE WHEN Bakiye < 0 THEN -Bakiye ELSE 0 END) AS alacakli,
+  SUM(Bakiye) AS net,
+  SUM(CASE WHEN Bakiye > 0 THEN 1 ELSE 0 END) AS borcluAdet,
+  SUM(CASE WHEN Bakiye < 0 THEN 1 ELSE 0 END) AS alacakliAdet
+FROM (
+  SELECT [Cari Kodu], SUM([Bakiye]) AS Bakiye
+  FROM [dbo].[${cari}]
+  WHERE [Tarih] <= CONVERT(datetime,'${toSqlDate(s.endDate)}',104)
+  GROUP BY [Cari Kodu]
+) T`);
 
   const isyeriKarlilik = rows.map((r) => ({
     isYeri: String(r.isYeri ?? ""),
@@ -144,8 +154,12 @@ ORDER BY NAME`;
     personelGideri: rows.reduce((a, r) => a + Number(r.personel ?? 0), 0),
     netKar: rows.reduce((a, r) => a + Number(r.netKar ?? 0), 0),
     bankaTlBakiye: Number(bankaRows[0]?.bakiye ?? 0),
-    negatifStokAdedi: Number(negatifRows[0]?.adet ?? 0),
     krediKalan: Number(krediRows[0]?.kalan ?? 0),
+    cariBorclu: Number(cariRows[0]?.borclu ?? 0),
+    cariAlacakli: Number(cariRows[0]?.alacakli ?? 0),
+    cariNet: Number(cariRows[0]?.net ?? 0),
+    cariBorcluAdet: Number(cariRows[0]?.borcluAdet ?? 0),
+    cariAlacakliAdet: Number(cariRows[0]?.alacakliAdet ?? 0),
     isyeriKarlilik,
     source: "sql",
   };
@@ -310,11 +324,194 @@ ORDER BY [Stok Kodu],[Tarih]`);
   return toReport(rows, "sql");
 }
 
+/** Cari bakiyeler: her zaman bitiş tarihine kadar kümülatif */
+export async function getCariBakiyeListe(
+  tip: "all" | "borc" | "alacak" = "all"
+): Promise<ReportResponse> {
+  const s = sessionOrThrow();
+  if (!assertLive(s)) return demoCariListe(tip);
+  await ensureLiveViews();
+  const end = toSqlDate(s.endDate);
+  const having =
+    tip === "borc"
+      ? "HAVING SUM([Bakiye]) > 0"
+      : tip === "alacak"
+        ? "HAVING SUM([Bakiye]) < 0"
+        : "";
+  const rows = await liveQuery(`
+SELECT
+  MAX([Kullanım Durum]) AS [Kullanım Durum],
+  [Cari Kodu],
+  MAX([Cari Adı]) AS [Cari Adı],
+  MAX([Cari Özel Kod]) AS [Cari Özel Kod],
+  MAX([Cari Özel Kod2]) AS [Cari Özel Kod2],
+  MAX([Cari Özel Kod3]) AS [Cari Özel Kod3],
+  SUM([Borç]) AS [Borç],
+  SUM([Alacak]) AS [Alacak],
+  SUM([Bakiye]) AS [Bakiye],
+  CASE WHEN SUM([Bakiye]) > 0 THEN N'Borç' WHEN SUM([Bakiye]) < 0 THEN N'Alacak' ELSE N'Sıfır' END AS [Bakiye Tipi]
+FROM [dbo].[${v("CARIBAKIYELER")}]
+WHERE [Tarih] <= CONVERT(datetime,'${end}',104)
+GROUP BY [Cari Kodu]
+${having}
+ORDER BY [Cari Kodu]`);
+
+  const totals: ReportRow = {
+    "Kullanım Durum": "",
+    "Cari Kodu": "",
+    "Cari Adı": "GENEL TOPLAM",
+    "Cari Özel Kod": "",
+    "Cari Özel Kod2": "",
+    "Cari Özel Kod3": "",
+    Borç: rows.reduce((a, r) => a + Number(r["Borç"] ?? 0), 0),
+    Alacak: rows.reduce((a, r) => a + Number(r["Alacak"] ?? 0), 0),
+    Bakiye: rows.reduce((a, r) => a + Number(r["Bakiye"] ?? 0), 0),
+    "Bakiye Tipi": "",
+  };
+  return {
+    columns: [
+      "Cari Kodu",
+      "Cari Adı",
+      "Borç",
+      "Alacak",
+      "Bakiye",
+      "Bakiye Tipi",
+      "Kullanım Durum",
+      "Cari Özel Kod",
+      "Cari Özel Kod2",
+      "Cari Özel Kod3",
+    ],
+    defaultVisible: ["Cari Kodu", "Cari Adı", "Borç", "Alacak", "Bakiye", "Bakiye Tipi"],
+    rows,
+    totals,
+    meta: { endDate: s.endDate, tip },
+    source: "sql",
+  };
+}
+
+export async function getCariBakiyeOzet(): Promise<ReportResponse> {
+  const s = sessionOrThrow();
+  if (!assertLive(s)) return demoCariOzet();
+  await ensureLiveViews();
+  const end = toSqlDate(s.endDate);
+  const rows = await liveQuery(`
+SELECT
+  SUM(CASE WHEN Bakiye > 0 THEN Bakiye ELSE 0 END) AS [Borçlu Cariler Toplamı],
+  SUM(CASE WHEN Bakiye < 0 THEN -Bakiye ELSE 0 END) AS [Alacaklı Cariler Toplamı],
+  SUM(Bakiye) AS [Net Bakiye],
+  SUM(CASE WHEN Bakiye > 0 THEN 1 ELSE 0 END) AS [Borçlu Adet],
+  SUM(CASE WHEN Bakiye < 0 THEN 1 ELSE 0 END) AS [Alacaklı Adet],
+  SUM(CASE WHEN Bakiye = 0 THEN 1 ELSE 0 END) AS [Sıfır Adet]
+FROM (
+  SELECT [Cari Kodu], SUM([Bakiye]) AS Bakiye
+  FROM [dbo].[${v("CARIBAKIYELER")}]
+  WHERE [Tarih] <= CONVERT(datetime,'${end}',104)
+  GROUP BY [Cari Kodu]
+) T`);
+  return {
+    ...toReport(rows, "sql"),
+    defaultVisible: [
+      "Borçlu Cariler Toplamı",
+      "Alacaklı Cariler Toplamı",
+      "Net Bakiye",
+      "Borçlu Adet",
+      "Alacaklı Adet",
+    ],
+    meta: { endDate: s.endDate },
+  };
+}
+
+function demoCariListe(tip: "all" | "borc" | "alacak"): ReportResponse {
+  let rows = [
+    {
+      "Cari Kodu": "120.01.0001",
+      "Cari Adı": "ÖRNEK MÜŞTERİ A.Ş.",
+      Borç: 150000,
+      Alacak: 20000,
+      Bakiye: 130000,
+      "Bakiye Tipi": "Borç",
+      "Kullanım Durum": "Kullanımda",
+      "Cari Özel Kod": "",
+      "Cari Özel Kod2": "",
+      "Cari Özel Kod3": "",
+    },
+    {
+      "Cari Kodu": "320.01.0010",
+      "Cari Adı": "TEDARİKÇİ LTD.",
+      Borç: 10000,
+      Alacak: 85000,
+      Bakiye: -75000,
+      "Bakiye Tipi": "Alacak",
+      "Kullanım Durum": "Kullanımda",
+      "Cari Özel Kod": "",
+      "Cari Özel Kod2": "",
+      "Cari Özel Kod3": "",
+    },
+  ];
+  if (tip === "borc") rows = rows.filter((r) => Number(r.Bakiye) > 0);
+  if (tip === "alacak") rows = rows.filter((r) => Number(r.Bakiye) < 0);
+  return {
+    columns: [
+      "Cari Kodu",
+      "Cari Adı",
+      "Borç",
+      "Alacak",
+      "Bakiye",
+      "Bakiye Tipi",
+      "Kullanım Durum",
+      "Cari Özel Kod",
+      "Cari Özel Kod2",
+      "Cari Özel Kod3",
+    ],
+    defaultVisible: ["Cari Kodu", "Cari Adı", "Borç", "Alacak", "Bakiye", "Bakiye Tipi"],
+    rows,
+    totals: {
+      "Cari Adı": "GENEL TOPLAM",
+      Borç: rows.reduce((a, r) => a + Number(r.Borç), 0),
+      Alacak: rows.reduce((a, r) => a + Number(r.Alacak), 0),
+      Bakiye: rows.reduce((a, r) => a + Number(r.Bakiye), 0),
+    },
+    source: "demo",
+  };
+}
+
+function demoCariOzet(): ReportResponse {
+  return {
+    columns: [
+      "Borçlu Cariler Toplamı",
+      "Alacaklı Cariler Toplamı",
+      "Net Bakiye",
+      "Borçlu Adet",
+      "Alacaklı Adet",
+      "Sıfır Adet",
+    ],
+    rows: [
+      {
+        "Borçlu Cariler Toplamı": 130000,
+        "Alacaklı Cariler Toplamı": 75000,
+        "Net Bakiye": 55000,
+        "Borçlu Adet": 1,
+        "Alacaklı Adet": 1,
+        "Sıfır Adet": 0,
+      },
+    ],
+    source: "demo",
+  };
+}
+
 export async function refreshAllReports() {
   const s = sessionOrThrow();
   if (!s.demoMode) {
     const statuses = await ensureViews(s.firmaNr, s.donemNr, { force: true });
-    const failed = statuses.filter((x) => !x.exists);
+    const failed = statuses.filter(
+      (x) =>
+        x.name.startsWith("BAYRAK_") &&
+        !x.exists &&
+        (x.name.includes("FATURARAPOR") ||
+          x.name.includes("HIZMETRAPOR") ||
+          x.name.includes("MUHASEBERAPOR") ||
+          x.name.includes("CARIBAKIYELER"))
+    );
     if (failed.length) {
       return {
         ok: false,
@@ -331,7 +528,7 @@ export async function refreshAllReports() {
     getFaturaReport(),
     getHizmetReport(),
     getPersonelReport(),
-    getNegatifReport(),
+    getCariBakiyeListe("all"),
     getDashboard(),
   ]);
   const rejected = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];

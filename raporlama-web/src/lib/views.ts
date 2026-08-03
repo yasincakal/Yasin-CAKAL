@@ -11,6 +11,7 @@ export const REQUIRED_VIEWS = [
   "BANKARAPOR",
   "KREDIRAPOR",
   "STOK_NEGATIF",
+  "CARIBAKIYELER",
 ] as const;
 
 export type RequiredView = (typeof REQUIRED_VIEWS)[number];
@@ -20,6 +21,7 @@ export const CRITICAL_VIEWS: RequiredView[] = [
   "FATURARAPOR",
   "HIZMETRAPOR",
   "MUHASEBERAPOR",
+  "CARIBAKIYELER",
 ];
 
 function templatePath(name: string) {
@@ -64,6 +66,7 @@ export async function preflightTables(firmaNr: string, donemNr: string) {
     `LG_${firma}_${donem}_EMFLINE`,
     `LG_${firma}_CLCARD`,
     `LG_${firma}_ITEMS`,
+    `LV_${firma}_${donem}_CLEKSTRE`,
     `L_CAPIFIRM`,
     `L_CAPIPERIOD`,
     `L_CAPIDIV`,

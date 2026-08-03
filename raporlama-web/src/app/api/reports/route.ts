@@ -3,6 +3,8 @@ import { loadSession, saveSession } from "@/lib/config";
 import {
   getBankaOzetReport,
   getBankaReport,
+  getCariBakiyeListe,
+  getCariBakiyeOzet,
   getDashboard,
   getFaturaReport,
   getHizmetReport,
@@ -33,6 +35,11 @@ const handlers: Record<string, (sp: URLSearchParams) => Promise<unknown>> = {
       fisTur: sp.get("fisTur") ?? "",
       onlyNegative: sp.get("onlyNegative") !== "0",
     }),
+  "cari-ozet": async () => getCariBakiyeOzet(),
+  "cari-liste": async (sp) => {
+    const tip = (sp.get("tip") || "all") as "all" | "borc" | "alacak";
+    return getCariBakiyeListe(tip);
+  },
   refresh: async () => refreshAllReports(),
 };
 

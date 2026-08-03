@@ -1,4 +1,86 @@
 IF OBJECT_ID(N'[dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_KREDIRAPOR]', N'V') IS NOT NULL DROP VIEW [dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_KREDIRAPOR];
 GO
-CREATE VIEW [dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_KREDIRAPOR] AS     with taksitler as (   select    [KREDI_REF]      = kredi.LOGICALREF,    [TAKSIT_REF]     = taksitHar.LOGICALREF,    [PARENTREF]      = taksitHar.PARENTREF,    [Banka Kodu]     = bank.CODE,    [Banka Adı]      = bank.DEFINITION_,    [Hesap Kodu]     = hesap.CODE,    [Hesap Adı]      = hesap.DEFINITION_,    [Kre.Hs. Kodu]   = kredi.CODE,    [Kre.Hs. Adı]    = kredi.NAME_,    [Kre.Kart Türü]  = case kredi.CRCARDTYPE when 1 then 'İşletme Kredisi' when 2 then 'Yatırım Kredisi'             else 'Ticari Kredi' end,    [Kre.Hes. Türü]  = case kredi.CRCALCTYPE when 1 then 'Spot Kredi'      when 2 then 'Borçlu Cari Kredi (Rotatif)' else 'İskonto - İştria Kredi' end,    [Kre. Türü]      = case kredi.CREDITTYPE when 1 then 'Çek Karş. Kredi' when 2 then 'Senet Karş. Kredi'           else 'Teminatsız Kredi' end,    [Kre. Başlangıç] = kredi.BEGDATE,    [Kre. Bitiş]     = kredi.ENDDATE,    [Kre. Tutarı]    = kredi.TRTOTAL,    [Taksit Say.]    = kredi.DUEDATE,    [Taksit Vade]    = taksitHar.DUEDATE,    [Taksit Anapara] = taksitHar.TOTAL,    [Taksit Faiz]    = taksitHar.INTTOTAL,    [Taksit BSMV]    = taksitHar.BSMVTOTAL,    [Taksit KKDF]    = taksitHar.KKDFTOTAL   from LG_{{FIRMA}}_BNCREDITCARD kredi    inner join LG_{{FIRMA}}_BNCREPAYTR taksitHar on taksitHar.CREDITREF = kredi.LOGICALREF and taksitHar.TRANSTYPE = 0    inner join LG_{{FIRMA}}_BNCARD bank on bank.LOGICALREF = kredi.BNREF    inner join LG_{{FIRMA}}_BANKACC hesap on hesap.LOGICALREF = kredi.BNCRACCREF  ), odemeler as (   select    [KREDI_REF]       = kredi.LOGICALREF,    [TAKSIT_REF]      = odemeHar.LOGICALREF,    [PARENTREF]       = odemeHar.PARENTREF,    [FROMCREDITCLOSE] = odemeHar.FROMCREDITCLOSE,    [Ödeme Anapara]   = odemeHar.TOTAL,    [Ödeme Faiz]      = odemeHar.INTTOTAL,    [Ödeme BSMV]      = odemeHar.BSMVTOTAL,    [Ödeme KKDF]      = odemeHar.KKDFTOTAL,    [Ödeme Günü]      = odemeHar.OPRDATE   from LG_{{FIRMA}}_BNCREDITCARD kredi    inner join LG_{{FIRMA}}_BNCREPAYTR odemeHar on odemeHar.CREDITREF = kredi.LOGICALREF and odemeHar.TRANSTYPE = 1    )  select      taksit.[Banka Kodu],      taksit.[Banka Adı],      taksit.[Hesap Kodu],      taksit.[Hesap Adı],      taksit.[Kre.Hs. Kodu],      taksit.[Kre.Hs. Adı],      taksit.[Kre.Kart Türü],      taksit.[Kre.Hes. Türü],      taksit.[Kre. Türü],      taksit.[Kre. Başlangıç],      taksit.[Kre. Bitiş],      taksit.[Kre. Tutarı],      taksit.[Taksit Say.],      taksit.[Taksit Vade],      [Ödeme Günü]     = odeme.[Ödeme Günü],      [Taksit Anapara] = Round(taksit.[Taksit Anapara], 2),      [Taksit Faiz]    = Round(taksit.[Taksit Faiz],    2),      [Taksit BSMV]    = Round(taksit.[Taksit BSMV],    2),      [Taksit KKDF]    = Round(taksit.[Taksit KKDF],    2),      [Ödeme Anapara]  = Round(odeme.[Ödeme Anapara],   2),      [Ödeme Faiz]     = Round(odeme.[Ödeme Faiz],      2),      [Ödeme BSMV]     = Round(odeme.[Ödeme BSMV],      2),      [Ödeme KKDF]     = Round(odeme.[Ödeme KKDF],      2),   [Kalan Tutar] =  Round(        (ISNULL(taksit.[Taksit Anapara],0)       + ISNULL(taksit.[Taksit Faiz],0)       + ISNULL(taksit.[Taksit BSMV],0)       + ISNULL(taksit.[Taksit KKDF],0))      -        (ISNULL(odeme.[Ödeme Anapara],0)       + ISNULL(odeme.[Ödeme Faiz],0)       + ISNULL(odeme.[Ödeme BSMV],0)       + ISNULL(odeme.[Ödeme KKDF],0))  ,2),      [Kalan]          = CASE WHEN odeme.FROMCREDITCLOSE = 1 OR odeme.[Ödeme Anapara] IS NOT NULL THEN 'Kapandı' ELSE 'Yürürlükte' END  from taksitler taksit          left join odemeler odeme on odeme.KREDI_REF = taksit.KREDI_REF and (odeme.PARENTREF = taksit.TAKSIT_REF or odeme.PARENTREF = taksit.PARENTREF)
+CREATE VIEW [dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_KREDIRAPOR] AS 
+
+with taksitler as (
+	select
+		[KREDI_REF]      = kredi.LOGICALREF,
+		[TAKSIT_REF]     = taksitHar.LOGICALREF,
+		[PARENTREF]      = taksitHar.PARENTREF,
+		[Banka Kodu]     = bank.CODE,
+		[Banka Adı]      = bank.DEFINITION_,
+		[Hesap Kodu]     = hesap.CODE,
+		[Hesap Adı]      = hesap.DEFINITION_,
+		[Kre.Hs. Kodu]   = kredi.CODE,
+		[Kre.Hs. Adı]    = kredi.NAME_,
+		[Kre.Kart Türü]  = case kredi.CRCARDTYPE when 1 then 'İşletme Kredisi' when 2 then 'Yatırım Kredisi'             else 'Ticari Kredi' end,
+		[Kre.Hes. Türü]  = case kredi.CRCALCTYPE when 1 then 'Spot Kredi'      when 2 then 'Borçlu Cari Kredi (Rotatif)' else 'İskonto - İştria Kredi' end,
+		[Kre. Türü]      = case kredi.CREDITTYPE when 1 then 'Çek Karş. Kredi' when 2 then 'Senet Karş. Kredi'           else 'Teminatsız Kredi' end,
+		[Kre. Başlangıç] = kredi.BEGDATE,
+		[Kre. Bitiş]     = kredi.ENDDATE,
+		[Kre. Tutarı]    = kredi.TRTOTAL,
+		[Taksit Say.]    = kredi.DUEDATE,
+		[Taksit Vade]    = taksitHar.DUEDATE,
+		[Taksit Anapara] = taksitHar.TOTAL,
+		[Taksit Faiz]    = taksitHar.INTTOTAL,
+		[Taksit BSMV]    = taksitHar.BSMVTOTAL,
+		[Taksit KKDF]    = taksitHar.KKDFTOTAL
+	from LG_{{FIRMA}}_BNCREDITCARD kredi
+		inner join LG_{{FIRMA}}_BNCREPAYTR taksitHar on taksitHar.CREDITREF = kredi.LOGICALREF and taksitHar.TRANSTYPE = 0
+		inner join LG_{{FIRMA}}_BNCARD bank on bank.LOGICALREF = kredi.BNREF
+		inner join LG_{{FIRMA}}_BANKACC hesap on hesap.LOGICALREF = kredi.BNCRACCREF
+), odemeler as (
+	select
+		[KREDI_REF]       = kredi.LOGICALREF,
+		[TAKSIT_REF]      = odemeHar.LOGICALREF,
+		[PARENTREF]       = odemeHar.PARENTREF,
+		[FROMCREDITCLOSE] = odemeHar.FROMCREDITCLOSE,
+		[Ödeme Anapara]   = odemeHar.TOTAL,
+		[Ödeme Faiz]      = odemeHar.INTTOTAL,
+		[Ödeme BSMV]      = odemeHar.BSMVTOTAL,
+		[Ödeme KKDF]      = odemeHar.KKDFTOTAL,
+		[Ödeme Günü]      = odemeHar.OPRDATE
+	from LG_{{FIRMA}}_BNCREDITCARD kredi
+		inner join LG_{{FIRMA}}_BNCREPAYTR odemeHar on odemeHar.CREDITREF = kredi.LOGICALREF and odemeHar.TRANSTYPE = 1		
+)
+select
+    taksit.[Banka Kodu],
+    taksit.[Banka Adı],
+    taksit.[Hesap Kodu],
+    taksit.[Hesap Adı],
+    taksit.[Kre.Hs. Kodu],
+    taksit.[Kre.Hs. Adı],
+    taksit.[Kre.Kart Türü],
+    taksit.[Kre.Hes. Türü],
+    taksit.[Kre. Türü],
+    taksit.[Kre. Başlangıç],
+    taksit.[Kre. Bitiş],
+    taksit.[Kre. Tutarı],
+    taksit.[Taksit Say.],
+    taksit.[Taksit Vade],
+    [Ödeme Günü]     = odeme.[Ödeme Günü],
+    [Taksit Anapara] = Round(taksit.[Taksit Anapara], 2),
+    [Taksit Faiz]    = Round(taksit.[Taksit Faiz],    2),
+    [Taksit BSMV]    = Round(taksit.[Taksit BSMV],    2),
+    [Taksit KKDF]    = Round(taksit.[Taksit KKDF],    2),
+    [Ödeme Anapara]  = Round(odeme.[Ödeme Anapara],   2),
+    [Ödeme Faiz]     = Round(odeme.[Ödeme Faiz],      2),
+    [Ödeme BSMV]     = Round(odeme.[Ödeme BSMV],      2),
+    [Ödeme KKDF]     = Round(odeme.[Ödeme KKDF],      2),
+	[Kalan Tutar] =
+Round(
+      (ISNULL(taksit.[Taksit Anapara],0)
+     + ISNULL(taksit.[Taksit Faiz],0)
+     + ISNULL(taksit.[Taksit BSMV],0)
+     + ISNULL(taksit.[Taksit KKDF],0))
+    -
+      (ISNULL(odeme.[Ödeme Anapara],0)
+     + ISNULL(odeme.[Ödeme Faiz],0)
+     + ISNULL(odeme.[Ödeme BSMV],0)
+     + ISNULL(odeme.[Ödeme KKDF],0))
+,2),
+    [Kalan]          = CASE WHEN odeme.FROMCREDITCLOSE = 1 OR odeme.[Ödeme Anapara] IS NOT NULL THEN 'Kapandı' ELSE 'Yürürlükte' END
+from taksitler taksit
+    /* Parantez içi ilk koşulun null olması durumda sonrakine bakacak */
+	left join odemeler odeme on odeme.KREDI_REF = taksit.KREDI_REF and (odeme.PARENTREF = taksit.TAKSIT_REF or odeme.PARENTREF = taksit.PARENTREF)
 GO

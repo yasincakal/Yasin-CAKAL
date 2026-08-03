@@ -15,11 +15,31 @@ if not exist "node_modules\" (
   call npm install
 )
 
+REM Yerel IP bul
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
+  set IP=%%a
+  goto :found
+)
+:found
+set IP=%IP: =%
+
 echo.
-echo  Raporlama aciliyor...
-echo  Tarayici: http://localhost:3000
-echo  Durdurmak icin bu pencerede Ctrl+C
+echo  ========================================
+echo   Raporlama Programi - Ag Erisimi
+echo  ========================================
+echo.
+echo  Bu PC:     http://localhost:3000/Raporlar
+if defined IP echo  Agdan:    http://%IP%:3000/Raporlar
+echo.
+echo  Diger kullanicilar Chrome ile ag adresini acabilir.
+echo  Windows Firewall'da 3000 portuna izin verin.
+echo  Durdurmak icin Ctrl+C
 echo.
 
-start "" http://localhost:3000
-call npm run dev
+if not exist ".next\" (
+  echo Ilk acilis build aliniyor...
+  call npm run build
+)
+
+start "" "http://localhost:3000/Raporlar"
+call npm start

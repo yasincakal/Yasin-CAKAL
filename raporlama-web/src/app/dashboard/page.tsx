@@ -14,6 +14,7 @@ import {
 import { TopBar } from "@/components/TopBar";
 import { Panel, SourceBadge, StatCard } from "@/components/ui";
 import { useApp } from "@/context/app-context";
+import { apiUrl } from "@/lib/base-path";
 import { formatMoney } from "@/lib/format";
 import type { DashboardSummary } from "@/lib/types";
 
@@ -31,7 +32,7 @@ export default function DashboardPage() {
     let cancelled = false;
     void (async () => {
       setError("");
-      const res = await fetch("/api/reports?type=dashboard");
+      const res = await fetch(apiUrl("/api/reports?type=dashboard"));
       const json = await res.json();
       if (cancelled) return;
       if (!res.ok) {
@@ -53,7 +54,7 @@ export default function DashboardPage() {
         subtitle={
           session?.demoMode
             ? "Demo veri (statik)"
-            : `Canlı SQL · Firma ${session?.firmaNr}/${session?.donemNr}${session?.database ? ` · ${session.database}` : ""}`
+            : `Canlı SQL · Firma ${session?.firmaNr}/${session?.donemNr}${session?.database ? ` · ${session.database}` : ""} · Cari bakiyeler bitiş tarihine kadar`
         }
       />
 
@@ -85,18 +86,26 @@ export default function DashboardPage() {
         />
         <StatCard label="Kredi Kalan" value={data?.krediKalan ?? 0} />
         <StatCard
-          label="Negatif Stok"
-          value={String(data?.negatifStokAdedi ?? 0)}
-          hint="Kritik stok hareketi"
+          label="Cari Borçlu Toplam"
+          value={data?.cariBorclu ?? 0}
+          hint={`${data?.cariBorcluAdet ?? 0} cari`}
+          tone="accent"
+        />
+        <StatCard
+          label="Cari Alacaklı Toplam"
+          value={data?.cariAlacakli ?? 0}
+          hint={`${data?.cariAlacakliAdet ?? 0} cari`}
           tone="bad"
+        />
+        <StatCard
+          label="Cari Net Bakiye"
+          value={data?.cariNet ?? 0}
+          tone={(data?.cariNet ?? 0) >= 0 ? "good" : "bad"}
         />
       </div>
 
       <div className="grid-2">
-        <Panel
-          title="İş Yeri Karlılık"
-          actions={<SourceBadge source={data?.source} />}
-        >
+        <Panel title="İş Yeri Karlılık" actions={<SourceBadge source={data?.source} />}>
           <div className="chart-panel">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data?.isyeriKarlilik ?? []}>
@@ -117,6 +126,7 @@ export default function DashboardPage() {
         <Panel title="Hızlı Raporlar">
           <div style={{ padding: 16, display: "grid", gap: 10 }}>
             {[
+              ["/raporlar/cari", "Cari Bakiyeler"],
               ["/raporlar/karlilik", "A-1 Yönetim Karlılık"],
               ["/raporlar/banka", "A-2 Banka Rapor"],
               ["/raporlar/kredi", "A-3 Banka Kredi"],
@@ -125,11 +135,7 @@ export default function DashboardPage() {
               ["/raporlar/personel", "B-3 Personel Gideri"],
               ["/raporlar/negatif", "C-2 Negatif Stok"],
             ].map(([href, label]) => (
-              <button
-                key={href}
-                className="firm-item"
-                onClick={() => router.push(href)}
-              >
+              <button key={href} className="firm-item" onClick={() => router.push(href)}>
                 <strong>{label}</strong>
               </button>
             ))}

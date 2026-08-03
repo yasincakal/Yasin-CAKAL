@@ -1,28 +1,27 @@
-# Raporlama Programı (Web) — Windows PC
+# Raporlama Programı (Web) — Windows PC / Ağ
 
-Logo Tiger ERP raporlarını Excel yerine PC’de web arayüzle gösteren ayrı proje.
+Logo Tiger ERP raporlarını Chrome üzerinden, ağdaki birden fazla kullanıcının kullanabileceği ayrı proje.
 
-## PC’de kurulum (Windows)
+## PC / ağ erişimi
 
-1. ZIP indir:  
-   https://github.com/yasincakal/Yasin-CAKAL/archive/refs/heads/cursor/raporlama-web-e0d0.zip
-2. Açıp içindeki `raporlama-web` klasörünü örn. `C:\Users\pc34\raporlama-web` yap
+1. ZIP indir: https://github.com/yasincakal/Yasin-CAKAL/archive/refs/heads/cursor/raporlama-web-e0d0.zip
+2. `raporlama-web` klasörünü örn. `C:\Users\pc34\raporlama-web` yap
 3. [Node.js LTS](https://nodejs.org) kur
-4. `KURULUM.bat` → sonra `BASLAT.bat`
+4. `KURULUM.bat` → `BASLAT.bat`
 
-Tarayıcı: http://localhost:3000  
+Adresler:
+- Bu PC: `http://localhost:3000/Raporlar`
+- Ağ: `http://192.168.x.x:3000/Raporlar`
+
+Windows Güvenlik Duvarı’nda **3000** portuna izin verin.
+
+## Özellikler
+
+- SQL bağlantı + firma/dönem + otomatik view
+- Dashboard (satış, kar, banka, kredi, **cari borçlu/alacaklı**)
+- Cari bakiyeler (bitiş tarihine kadar kümülatif, sekmeler, dip toplam)
+- Tüm raporlarda **Sütunlar** (gizli alanları aç/kapat)
+- **PDF / Excel** kaydet
+- Negatif stok ayrı menüde
+
 Ayar dosyası: `C:\ProgramData\RaporlamaWeb\`
-
-Detay: `KURULUM-PC.txt`
-
-## Geliştirici
-
-```bash
-cd raporlama-web
-npm install
-npm run dev
-```
-
-## Not
-
-Cari hesap web’den bağımsızdır; yalnızca raporlama içindir.

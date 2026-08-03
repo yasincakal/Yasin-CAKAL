@@ -27,12 +27,19 @@ C:\Users\pc34\raporlama-web\KURULUM.bat  dosyasına çift tıkla
 -----------
 C:\Users\pc34\raporlama-web\BASLAT.bat  dosyasına çift tıkla
 
-Tarayıcı otomatik açılır: http://localhost:3000
-SQL yoksa ekranda "Demo ile Devam" de.
+Tarayıcı:
+  Bu PC : http://localhost:3000/Raporlar
+  Ağdan : http://192.168.x.x:3000/Raporlar
+
+Aynı ağdaki diğer kişiler Chrome ile IP adresini açabilir.
+Windows Güvenlik Duvarı'nda 3000 portuna izin verin.
 
 Bağlantı ayarları Windows'ta şurada saklanır:
   C:\ProgramData\RaporlamaWeb\
 
+Cari bakiyeler bitiş tarihine kadar kümülatiftir.
+Raporlarda Sütunlar ile gizli alanları açabilirsiniz.
+PDF / Excel kaydet tüm raporlarda vardır.
 SQL bağlantı hatası: "Port for SQL2025 not found"
 -------------------------------------------------
 Named instance portu bulunamıyor demektir.

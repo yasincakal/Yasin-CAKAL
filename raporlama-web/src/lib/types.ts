@@ -3,7 +3,6 @@ export type DbConfig = {
   database: string;
   user: string;
   password: string;
-  /** Named instance port (SQL Browser yoksa zorunlu), örn. 1433 */
   port?: number;
   encrypt?: boolean;
   trustServerCertificate?: boolean;
@@ -29,15 +28,6 @@ export type AppSession = {
   demoMode?: boolean;
 };
 
-export type LogoFirmPeriodRow = {
-  "Firma Adı": string;
-  Database: string;
-  "Firma No": string;
-  "Dönem No": string;
-  "Başlangıç Tarihi": Date | string;
-  "Bitiş Tarihi": Date | string;
-};
-
 export type ConnectionTestResult = {
   ok: boolean;
   message: string;
@@ -55,10 +45,21 @@ export type ReportRow = Record<string, string | number | null | boolean>;
 
 export type ReportResponse = {
   columns: string[];
+  /** Varsayılan görünür sütunlar (diğerleri gizli seçilebilir) */
+  defaultVisible?: string[];
   rows: ReportRow[];
   totals?: ReportRow;
   meta?: Record<string, unknown>;
   source: "sql" | "demo";
+};
+
+export type CariOzet = {
+  borcluToplam: number;
+  alacakliToplam: number;
+  netBakiye: number;
+  borcluAdet: number;
+  alacakliAdet: number;
+  sifirAdet: number;
 };
 
 export type DashboardSummary = {
@@ -69,8 +70,12 @@ export type DashboardSummary = {
   personelGideri: number;
   netKar: number;
   bankaTlBakiye: number;
-  negatifStokAdedi: number;
   krediKalan: number;
+  cariBorclu: number;
+  cariAlacakli: number;
+  cariNet: number;
+  cariBorcluAdet: number;
+  cariAlacakliAdet: number;
   isyeriKarlilik: Array<{
     isYeri: string;
     satis: number;

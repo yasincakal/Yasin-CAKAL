@@ -1,5 +1,7 @@
 "use client";
 
+import { apiUrl } from "@/lib/base-path";
+
 import { useState } from "react";
 import { ReportPage } from "@/components/ReportPage";
 import { Panel } from "@/components/ui";
@@ -15,7 +17,7 @@ export default function Page() {
   useEffect(() => {
     if (!session) return;
     void (async () => {
-      const res = await fetch("/api/reports?type=banka-ozet");
+      const res = await fetch(apiUrl("/api/reports?type=banka-ozet"));
       if (res.ok) setOzet(await res.json());
     })();
   }, [session, refreshing, session?.startDate, session?.endDate]);

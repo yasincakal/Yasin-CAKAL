@@ -28,8 +28,12 @@ export function demoDashboard(): DashboardSummary {
     personelGideri: 15_837_699.41,
     netKar: 18_471_663.35,
     bankaTlBakiye: -73_665_726.87,
-    negatifStokAdedi: 42,
     krediKalan: 12_450_000,
+    cariBorclu: 8_450_000,
+    cariAlacakli: 3_120_000,
+    cariNet: 5_330_000,
+    cariBorcluAdet: 186,
+    cariAlacakliAdet: 94,
     isyeriKarlilik: [
       { isYeri: "LİMAN ENZA", satis: 48_163_002.65, netKar: 6_163_606.73 },
       { isYeri: "GAZİ BULVARI ENZA", satis: 23_350_616.18, netKar: 6_570_371.82 },

@@ -13,12 +13,14 @@ import {
   Landmark,
   Users,
   Wrench,
+  WalletCards,
 } from "lucide-react";
 import { clsx } from "@/lib/format";
 import { useApp } from "@/context/app-context";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/raporlar/cari", label: "Cari Bakiyeler", icon: WalletCards },
   { href: "/raporlar/karlilik", label: "Yönetim Karlılık", icon: PieChart },
   { href: "/raporlar/banka", label: "Banka Rapor", icon: Landmark },
   { href: "/raporlar/kredi", label: "Banka Kredi", icon: CreditCard },

@@ -1,5 +1,7 @@
 "use client";
 
+import { apiUrl } from "@/lib/base-path";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/app-context";
@@ -35,7 +37,7 @@ export default function AyarlarPage() {
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch("/api/config");
+      const res = await fetch(apiUrl("/api/config"));
       const data = await res.json();
       if (data.config) {
         setForm({
@@ -64,7 +66,7 @@ export default function AyarlarPage() {
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch("/api/config", {
+      const res = await fetch(apiUrl("/api/config"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload(), action }),
@@ -86,7 +88,7 @@ export default function AyarlarPage() {
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch("/api/config/demo", { method: "POST" });
+      const res = await fetch(apiUrl("/api/config/demo"), { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Demo başlatılamadı");
       await reload();

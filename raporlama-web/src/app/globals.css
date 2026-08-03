@@ -538,6 +538,72 @@ select {
   }
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tab {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.tab.active {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand-deep);
+  font-weight: 600;
+}
+
+.column-picker {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  width: min(320px, 80vw);
+  max-height: 360px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 10px;
+}
+
+.column-picker-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.column-picker-actions button {
+  border: 0;
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.column-picker-list {
+  display: grid;
+  gap: 6px;
+}
+
+.column-picker-list label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.86rem;
+}
+
 @media (max-width: 1100px) {
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

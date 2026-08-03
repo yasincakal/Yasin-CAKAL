@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { apiUrl } from "@/lib/base-path";
 import type { AppSession } from "@/lib/types";
 
 type AppContextValue = {
@@ -31,7 +32,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
 
   const reload = useCallback(async () => {
-    const res = await fetch("/api/config");
+    const res = await fetch(apiUrl("/api/config"));
     const data = await res.json();
     setConfigured(Boolean(data.configured));
     setSession(data.session ?? null);
@@ -43,7 +44,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [reload]);
 
   const updateDates = useCallback(async (startDate: string, endDate: string) => {
-    await fetch("/api/reports", {
+    await fetch(apiUrl("/api/reports"), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ startDate, endDate }),
@@ -54,7 +55,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const refreshReports = useCallback(async () => {
     setRefreshing(true);
     try {
-      await fetch("/api/reports?type=refresh");
+      await fetch(apiUrl("/api/reports?type=refresh"));
     } finally {
       setRefreshing(false);
     }
