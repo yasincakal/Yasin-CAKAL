@@ -1,61 +1,35 @@
-Raporlama Programı — Windows PC Kurulumu
-========================================
+KURULUM - ÖNEMLİ (Windows)
+==========================
 
-Bu proje senin PC'nde çalışır. Dosyalar GitHub'da; bilgisayara indirmen gerekir.
+HATA: package.json bulunamadı / localhost bağlanmayı reddetti
+NEDEN: ZIP'i ayıklamadan Temp klasöründen çalıştırıyorsun.
 
-1) ZIP ile indir (en kolay)
----------------------------
-Tarayıcıda şu adresi aç:
+DOĞRU ADIMLAR
+-------------
+1) İndirdiğin ZIP dosyasına SAĞ TIKLA
+2) "Tümünü ayıkla..." / "Extract All..." seç
+3) Hedef klasör örneği:
+     C:\Users\pc34\RaporlamaKurulum
+4) Açılan klasörde şunu bul:
+     Yasin-CAKAL-cursor-raporlama-web-e0d0\raporlama-web\
+5) "raporlama-web" klasörünün tamamını kopyala:
+     C:\Users\pc34\raporlama-web\
 
-https://github.com/yasincakal/Yasin-CAKAL/archive/refs/heads/cursor/raporlama-web-e0d0.zip
+Sonuçta şu dosyalar görünmeli:
+  C:\Users\pc34\raporlama-web\package.json
+  C:\Users\pc34\raporlama-web\KURULUM.bat
+  C:\Users\pc34\raporlama-web\BASLAT.bat
 
-İndirilen ZIP'i aç (örnek):
-  C:\Users\pc34\Desktop\Yasin-CAKAL-cursor-raporlama-web-e0d0\
+6) C:\Users\pc34\raporlama-web\KURULUM.bat  (çift tık)
+7) C:\Users\pc34\raporlama-web\BASLAT.bat   (çift tık)
 
-İçindeki "raporlama-web" klasörünü şuraya kopyala:
-  C:\Users\pc34\raporlama-web\
+Chrome:
+  http://localhost:3000/Raporlar
 
-2) Node.js kur (bir kez)
-------------------------
-https://nodejs.org  →  LTS sürümünü kur
+AĞDAN (diğer PC'ler):
+  http://SENIN-IP:3000/Raporlar
+  (Windows Güvenlik Duvarı -> 3000 portuna izin)
 
-3) Kurulum
-----------
-C:\Users\pc34\raporlama-web\KURULUM.bat  dosyasına çift tıkla
-
-4) Çalıştır
------------
-C:\Users\pc34\raporlama-web\BASLAT.bat  dosyasına çift tıkla
-
-Tarayıcı:
-  Bu PC : http://localhost:3000/Raporlar
-  Ağdan : http://192.168.x.x:3000/Raporlar
-
-Aynı ağdaki diğer kişiler Chrome ile IP adresini açabilir.
-Windows Güvenlik Duvarı'nda 3000 portuna izin verin.
-
-Bağlantı ayarları Windows'ta şurada saklanır:
-  C:\ProgramData\RaporlamaWeb\
-
-Cari bakiyeler bitiş tarihine kadar kümülatiftir.
-Raporlarda Sütunlar ile gizli alanları açabilirsiniz.
-PDF / Excel kaydet tüm raporlarda vardır.
-SQL bağlantı hatası: "Port for SQL2025 not found"
--------------------------------------------------
-Named instance portu bulunamıyor demektir.
-
-Ayarlar ekranında:
-  Server : DESKTOP-97B4PJQ
-  Port   : (Configuration Manager'daki TCP Port, örn. 1433)
-
-veya Server alanına: DESKTOP-97B4PJQ,1433
-
-Port bulmak için:
-  SQL Server Configuration Manager
-  → SQL Server Network Configuration
-  → Protocols for SQL2025
-  → TCP/IP → Enabled
-  → IP Addresses → TCP Port / TCP Dynamic Ports
-
-Ayrıca Windows Services'te "SQL Server Browser" çalışıyor olmalı
-(port yazıyorsanız Browser şart değil).
+YANLIŞ:
+  ZIP'e çift tıklayıp Temp yolundan KURULUM.bat çalıştırmak
+  (...\AppData\Local\Temp\...zip...\KURULUM.bat)
