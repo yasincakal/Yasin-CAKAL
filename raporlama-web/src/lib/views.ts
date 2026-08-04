@@ -17,12 +17,7 @@ export const REQUIRED_VIEWS = [
 export type RequiredView = (typeof REQUIRED_VIEWS)[number];
 
 /** Raporlar için kritik view'lar — bunlar olmadan canlı veri çalışmaz */
-export const CRITICAL_VIEWS: RequiredView[] = [
-  "FATURARAPOR",
-  "HIZMETRAPOR",
-  "MUHASEBERAPOR",
-  "CARIBAKIYELER",
-];
+export const CRITICAL_VIEWS: RequiredView[] = [...REQUIRED_VIEWS];
 
 function templatePath(name: string) {
   return path.join(process.cwd(), "sql", "views", `${name}.sql`);

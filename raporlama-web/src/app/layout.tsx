@@ -1,24 +1,24 @@
 import type { Metadata } from "next";
-import { Fraunces, Manrope } from "next/font/google";
+import { Poppins, Source_Sans_3 } from "next/font/google";
 import { AppProvider } from "@/context/app-context";
 import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
-const display = Fraunces({
+const display = Poppins({
   variable: "--font-display",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
 });
 
-const body = Manrope({
+const body = Source_Sans_3({
   variable: "--font-body",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Raporlama Programı",
-  description: "Logo Tiger ERP yönetim ve karlılık raporlama web uygulaması",
+  title: "CariHesap Web — Logo Tiger Raporlama",
+  description: "Logo Tiger ERP cari, banka, karlılık ve stok raporlama web uygulaması",
 };
 
 export default function RootLayout({

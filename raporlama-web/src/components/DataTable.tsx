@@ -1,37 +1,13 @@
 "use client";
 
-import { formatDateTR, formatMoney } from "@/lib/format";
+import { formatDateTR, formatMoney, isCountCol, isMoneyCol, isPercentCol } from "@/lib/format";
 import type { ReportRow } from "@/lib/types";
-
-const MONEY_HINTS = [
-  "tutar",
-  "bakiye",
-  "borç",
-  "alacak",
-  "maliyet",
-  "kar",
-  "satış",
-  "gider",
-  "anapara",
-  "faiz",
-  "toplam",
-  "net",
-];
-
-function isMoneyCol(col: string) {
-  const c = col.toLocaleLowerCase("tr-TR");
-  return MONEY_HINTS.some((h) => c.includes(h)) && !c.includes("oran") && !c.includes("%");
-}
-
-function isPercentCol(col: string) {
-  const c = col.toLocaleLowerCase("tr-TR");
-  return c.includes("%") || c.includes("oran");
-}
 
 function cellValue(col: string, value: ReportRow[string]) {
   if (value == null || value === "") return "—";
   if (typeof value === "number") {
     if (isPercentCol(col)) return `${formatMoney(value)}%`;
+    if (isCountCol(col)) return formatMoney(value, Number.isInteger(value) ? 0 : 2);
     if (isMoneyCol(col)) return formatMoney(value);
     return formatMoney(value, Number.isInteger(value) ? 0 : 2);
   }
@@ -39,6 +15,10 @@ function cellValue(col: string, value: ReportRow[string]) {
     return formatDateTR(value);
   }
   return String(value);
+}
+
+function isNumericCol(col: string, sample: ReportRow[string]) {
+  return isMoneyCol(col) || isPercentCol(col) || isCountCol(col) || typeof sample === "number";
 }
 
 export function DataTable({
@@ -70,14 +50,7 @@ export function DataTable({
           {rows.map((row, i) => (
             <tr key={i}>
               {columns.map((c) => (
-                <td
-                  key={c}
-                  className={
-                    isMoneyCol(c) || isPercentCol(c) || typeof row[c] === "number"
-                      ? "num"
-                      : undefined
-                  }
-                >
+                <td key={c} className={isNumericCol(c, row[c]) ? "num" : undefined}>
                   {cellValue(c, row[c])}
                 </td>
               ))}
@@ -86,14 +59,7 @@ export function DataTable({
           {totals && (
             <tr className="totals-row">
               {columns.map((c) => (
-                <td
-                  key={c}
-                  className={
-                    isMoneyCol(c) || isPercentCol(c) || typeof totals[c] === "number"
-                      ? "num"
-                      : undefined
-                  }
-                >
+                <td key={c} className={isNumericCol(c, totals[c]) ? "num" : undefined}>
                   {cellValue(c, totals[c])}
                 </td>
               ))}

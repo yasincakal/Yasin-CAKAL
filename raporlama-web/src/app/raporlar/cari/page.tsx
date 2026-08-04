@@ -14,7 +14,7 @@ import type { ReportResponse } from "@/lib/types";
 type Tab = "ozet" | "borc" | "alacak" | "all";
 
 export default function CariPage() {
-  const { session, refreshing } = useApp();
+  const { session, refreshTick } = useApp();
   const [tab, setTab] = useState<Tab>("ozet");
   const [ozet, setOzet] = useState<ReportResponse | null>(null);
   const [liste, setListe] = useState<ReportResponse | null>(null);
@@ -49,7 +49,7 @@ export default function CariPage() {
     return () => {
       cancelled = true;
     };
-  }, [session, tab, refreshing, session?.endDate]);
+  }, [session, tab, refreshTick, session?.endDate]);
 
   const ozetRow = ozet?.rows?.[0];
   const allCols = liste?.columns ?? [];

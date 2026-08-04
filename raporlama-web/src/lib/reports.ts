@@ -13,7 +13,7 @@ import {
   demoNegatif,
   demoPersonel,
 } from "./demo-data";
-import { ensureViews } from "./views";
+import { ensureViews, REQUIRED_VIEWS } from "./views";
 import type { DashboardSummary, ReportResponse, ReportRow } from "./types";
 
 function sessionOrThrow() {
@@ -52,14 +52,10 @@ async function ensureLiveViews() {
   const s = sessionOrThrow();
   if (s.demoMode) return;
   const statuses = await ensureViews(s.firmaNr, s.donemNr, { force: false });
-  const failed = statuses.filter(
-    (x) =>
-      x.name.startsWith("BAYRAK_") &&
-      !x.exists &&
-      (x.name.includes("FATURARAPOR") ||
-        x.name.includes("HIZMETRAPOR") ||
-        x.name.includes("MUHASEBERAPOR"))
-  );
+  const failed = statuses.filter((x) => {
+    if (!x.name.startsWith("BAYRAK_") || x.exists) return false;
+    return REQUIRED_VIEWS.some((suffix) => x.name.endsWith(`_${suffix}`));
+  });
   if (failed.length) {
     throw new Error(
       `Kritik view eksik: ${failed.map((f) => `${f.name}${f.error ? ` (${f.error})` : ""}`).join("; ")}`
@@ -503,20 +499,15 @@ export async function refreshAllReports() {
   const s = sessionOrThrow();
   if (!s.demoMode) {
     const statuses = await ensureViews(s.firmaNr, s.donemNr, { force: true });
-    const failed = statuses.filter(
-      (x) =>
-        x.name.startsWith("BAYRAK_") &&
-        !x.exists &&
-        (x.name.includes("FATURARAPOR") ||
-          x.name.includes("HIZMETRAPOR") ||
-          x.name.includes("MUHASEBERAPOR") ||
-          x.name.includes("CARIBAKIYELER"))
-    );
+    const failed = statuses.filter((x) => {
+      if (!x.name.startsWith("BAYRAK_") || x.exists) return false;
+      return REQUIRED_VIEWS.some((suffix) => x.name.endsWith(`_${suffix}`));
+    });
     if (failed.length) {
       return {
         ok: false,
         count: 0,
-        message: `View hatası: ${failed.map((f) => f.name).join(", ")}`,
+        message: `View hatası: ${failed.map((f) => `${f.name}${f.error ? ` (${f.error})` : ""}`).join(", ")}`,
         statuses,
       };
     }
@@ -524,10 +515,14 @@ export async function refreshAllReports() {
   const results = await Promise.allSettled([
     getKarlilikReport(),
     getBankaReport(),
+    getBankaOzetReport(),
     getKrediOzetReport(),
+    getKrediDetayReport(),
     getFaturaReport(),
     getHizmetReport(),
     getPersonelReport(),
+    getNegatifReport(),
+    getCariBakiyeOzet(),
     getCariBakiyeListe("all"),
     getDashboard(),
   ]);

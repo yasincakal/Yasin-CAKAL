@@ -140,7 +140,7 @@ export default function FirmaClient() {
 
   return (
     <div className="setup-card wide">
-      <div className="brand-sub">Firma seçimi</div>
+      <div className="brand-sub">CariHesap Web</div>
       <h1>Çalışılacak firma ve dönem</h1>
       <p className="lead">
         Logo firma/dönem listesinden seçim yapın. Canlı modda rapor view&apos;ları

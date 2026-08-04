@@ -40,9 +40,9 @@ export async function POST(req: Request) {
     body.endDate ?? body.donemBitis ?? new Date().toISOString().slice(0, 10)
   );
 
-  // Canlı SQL config varken demoMode zorla kapalı
+  // Canlı SQL config varken varsayılan canlı; istemci demoMode=true gönderirse demo kabul
   const isDemoConfig = !cfg || cfg.server === "demo.local";
-  const demoMode = isDemoConfig ? true : false;
+  const demoMode = Boolean(body.demoMode) || isDemoConfig;
 
   if (!firmaNr || firmaNr === "000") {
     return NextResponse.json({ ok: false, message: "Firma seçiniz." }, { status: 400 });

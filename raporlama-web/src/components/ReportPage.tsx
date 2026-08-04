@@ -11,6 +11,15 @@ import { exportExcel, exportPdf } from "@/lib/export";
 import type { ReportResponse } from "@/lib/types";
 import { useApp } from "@/context/app-context";
 
+function useDebouncedValue<T>(value: T, delayMs = 400) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 export function ReportPage({
   title,
   subtitle,
@@ -28,12 +37,13 @@ export function ReportPage({
   filters?: ReactNode;
   defaultVisible?: string[];
 }) {
-  const { session, refreshing } = useApp();
+  const { session, refreshTick } = useApp();
   const [data, setData] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
-  const paramsKey = useMemo(() => JSON.stringify(extraParams ?? {}), [extraParams]);
+  const paramsRaw = useMemo(() => JSON.stringify(extraParams ?? {}), [extraParams]);
+  const paramsKey = useDebouncedValue(paramsRaw, 450);
   const key = reportKey || type;
 
   const allColumns = data?.columns ?? [];
@@ -63,7 +73,7 @@ export function ReportPage({
     return () => {
       cancelled = true;
     };
-  }, [session, type, paramsKey, refreshing, session?.startDate, session?.endDate]);
+  }, [session, type, paramsKey, refreshTick, session?.startDate, session?.endDate]);
 
   const visibleCols = cols.visible.length ? cols.visible : allColumns;
   const visibleRows = data?.rows ?? [];
@@ -118,11 +128,7 @@ export function ReportPage({
         {loading && <div className="empty-state">Yükleniyor…</div>}
         {error && <div className="error-box">{error}</div>}
         {!loading && !error && data && (
-          <DataTable
-            columns={visibleCols}
-            rows={visibleRows}
-            totals={visibleTotals}
-          />
+          <DataTable columns={visibleCols} rows={visibleRows} totals={visibleTotals} />
         )}
       </Panel>
     </div>

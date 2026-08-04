@@ -17,6 +17,7 @@ type AppContextValue = {
   configured: boolean;
   session: AppSession | null;
   refreshing: boolean;
+  refreshTick: number;
   setSessionLocal: (s: AppSession | null) => void;
   reload: () => Promise<void>;
   updateDates: (startDate: string, endDate: string) => Promise<void>;
@@ -30,6 +31,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [configured, setConfigured] = useState(false);
   const [session, setSession] = useState<AppSession | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const reload = useCallback(async () => {
     const res = await fetch(apiUrl("/api/config"));
@@ -43,14 +45,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void reload();
   }, [reload]);
 
-  const updateDates = useCallback(async (startDate: string, endDate: string) => {
-    await fetch(apiUrl("/api/reports"), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startDate, endDate }),
-    });
-    setSession((prev) => (prev ? { ...prev, startDate, endDate } : prev));
-  }, []);
+  const updateDates = useCallback(
+    async (startDate: string, endDate: string) => {
+      setSession((s) => (s ? { ...s, startDate, endDate } : s));
+      try {
+        const res = await fetch(apiUrl("/api/reports"), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ startDate, endDate }),
+        });
+        if (!res.ok) await reload();
+      } catch {
+        await reload();
+      }
+    },
+    [reload]
+  );
 
   const refreshReports = useCallback(async () => {
     setRefreshing(true);
@@ -58,6 +68,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await fetch(apiUrl("/api/reports?type=refresh"));
     } finally {
       setRefreshing(false);
+      setRefreshTick((t) => t + 1);
     }
   }, []);
 
@@ -67,12 +78,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       configured,
       session,
       refreshing,
+      refreshTick,
       setSessionLocal: setSession,
       reload,
       updateDates,
       refreshReports,
     }),
-    [ready, configured, session, refreshing, reload, updateDates, refreshReports]
+    [ready, configured, session, refreshing, refreshTick, reload, updateDates, refreshReports]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

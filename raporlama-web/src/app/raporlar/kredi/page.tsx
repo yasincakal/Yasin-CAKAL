@@ -35,10 +35,18 @@ function ExportBar({
         showAll={cols.showAll}
         reset={cols.reset}
       />
-      <button className="btn btn-ghost" type="button" onClick={() => exportExcel(title, visible, data.rows, data.totals)}>
+      <button
+        className="btn btn-ghost"
+        type="button"
+        onClick={() => exportExcel(title, visible, data.rows, data.totals)}
+      >
         <FileSpreadsheet size={16} /> Excel
       </button>
-      <button className="btn btn-primary" type="button" onClick={() => void exportPdf(title, visible, data.rows, data.totals)}>
+      <button
+        className="btn btn-primary"
+        type="button"
+        onClick={() => void exportPdf(title, visible, data.rows, data.totals)}
+      >
         <FileDown size={16} /> PDF Kaydet
       </button>
     </div>
@@ -46,31 +54,62 @@ function ExportBar({
 }
 
 export default function Page() {
-  const { session, refreshing } = useApp();
+  const { session, refreshTick } = useApp();
   const [ozet, setOzet] = useState<ReportResponse | null>(null);
   const [detay, setDetay] = useState<ReportResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const ozetCols = useColumnVisibility("kredi-ozet", ozet?.columns ?? []);
   const detayCols = useColumnVisibility(
     "kredi-detay",
     detay?.columns ?? [],
-    ["Banka Kodu", "Banka Adı", "Kre.Hs. Kodu", "Kre.Hs. Adı", "Taksit Vade", "Taksit Anapara", "Taksit Faiz", "Kalan Tutar", "Kalan"]
+    [
+      "Banka Kodu",
+      "Banka Adı",
+      "Kre.Hs. Kodu",
+      "Kre.Hs. Adı",
+      "Taksit Vade",
+      "Taksit Anapara",
+      "Taksit Faiz",
+      "Kalan Tutar",
+      "Kalan",
+    ]
   );
 
   useEffect(() => {
     if (!session) return;
+    let cancelled = false;
     void (async () => {
-      const [a, b] = await Promise.all([
-        fetch(apiUrl("/api/reports?type=kredi-ozet")),
-        fetch(apiUrl("/api/reports?type=kredi-detay")),
-      ]);
-      if (a.ok) setOzet(await a.json());
-      if (b.ok) setDetay(await b.json());
+      setLoading(true);
+      setError("");
+      try {
+        const [a, b] = await Promise.all([
+          fetch(apiUrl("/api/reports?type=kredi-ozet")),
+          fetch(apiUrl("/api/reports?type=kredi-detay")),
+        ]);
+        const aj = await a.json();
+        const bj = await b.json();
+        if (!a.ok) throw new Error(aj.message || "Kredi özet alınamadı");
+        if (!b.ok) throw new Error(bj.message || "Kredi detay alınamadı");
+        if (!cancelled) {
+          setOzet(aj);
+          setDetay(bj);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Hata");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
-  }, [session, refreshing, session?.startDate, session?.endDate]);
+    return () => {
+      cancelled = true;
+    };
+  }, [session, refreshTick, session?.startDate, session?.endDate]);
 
   return (
     <div className="page">
       <TopBar title="Banka Kredi" subtitle="Kredi taksit özeti ve detay hareketleri" />
+      {error && <div className="error-box" style={{ marginBottom: 14 }}>{error}</div>}
       <Panel
         title="Kredi Özet"
         actions={
@@ -82,10 +121,16 @@ export default function Page() {
           />
         }
       >
-        {ozet ? (
-          <DataTable columns={ozetCols.visible.length ? ozetCols.visible : ozet.columns} rows={ozet.rows} maxHeight={320} />
-        ) : (
+        {loading && !ozet ? (
           <div className="empty-state">Yükleniyor…</div>
+        ) : ozet ? (
+          <DataTable
+            columns={ozetCols.visible.length ? ozetCols.visible : ozet.columns}
+            rows={ozet.rows}
+            maxHeight={320}
+          />
+        ) : (
+          <div className="empty-state">Veri yok.</div>
         )}
       </Panel>
       <div style={{ height: 16 }} />
@@ -100,10 +145,15 @@ export default function Page() {
           />
         }
       >
-        {detay ? (
-          <DataTable columns={detayCols.visible.length ? detayCols.visible : detay.columns} rows={detay.rows} />
-        ) : (
+        {loading && !detay ? (
           <div className="empty-state">Yükleniyor…</div>
+        ) : detay ? (
+          <DataTable
+            columns={detayCols.visible.length ? detayCols.visible : detay.columns}
+            rows={detay.rows}
+          />
+        ) : (
+          <div className="empty-state">Veri yok.</div>
         )}
       </Panel>
     </div>

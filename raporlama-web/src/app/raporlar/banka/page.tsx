@@ -1,26 +1,39 @@
 "use client";
 
 import { apiUrl } from "@/lib/base-path";
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ReportPage } from "@/components/ReportPage";
 import { Panel } from "@/components/ui";
 import { DataTable } from "@/components/DataTable";
-import { useEffect } from "react";
 import type { ReportResponse } from "@/lib/types";
 import { useApp } from "@/context/app-context";
 
 export default function Page() {
-  const { session, refreshing } = useApp();
+  const { session, refreshTick } = useApp();
   const [ozet, setOzet] = useState<ReportResponse | null>(null);
+  const [ozetError, setOzetError] = useState("");
 
   useEffect(() => {
     if (!session) return;
+    let cancelled = false;
     void (async () => {
-      const res = await fetch(apiUrl("/api/reports?type=banka-ozet"));
-      if (res.ok) setOzet(await res.json());
+      setOzetError("");
+      try {
+        const res = await fetch(apiUrl("/api/reports?type=banka-ozet"));
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "Banka özet alınamadı");
+        if (!cancelled) setOzet(json);
+      } catch (err) {
+        if (!cancelled) {
+          setOzet(null);
+          setOzetError(err instanceof Error ? err.message : "Hata");
+        }
+      }
     })();
-  }, [session, refreshing, session?.startDate, session?.endDate]);
+    return () => {
+      cancelled = true;
+    };
+  }, [session, refreshTick, session?.startDate, session?.endDate]);
 
   return (
     <>
@@ -29,13 +42,14 @@ export default function Page() {
         subtitle="Banka hesap bakiyeleri ve döviz kırılımı"
         type="banka"
       />
-      {ozet && (
-        <div className="page" style={{ paddingTop: 0 }}>
+      <div className="page" style={{ paddingTop: 0 }}>
+        {ozetError && <div className="error-box" style={{ marginBottom: 12 }}>{ozetError}</div>}
+        {ozet && (
           <Panel title="Banka Özet">
             <DataTable columns={ozet.columns} rows={ozet.rows} maxHeight={320} />
           </Panel>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 }

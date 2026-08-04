@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title Raporlama SUNUCU - BU PENCEREYI KAPATMAYIN
+title CariHesap Web SUNUCU - BU PENCEREYI KAPATMAYIN
 cd /d "%~dp0"
 
 echo.
@@ -33,17 +33,26 @@ if not exist "node_modules\" (
 )
 
 echo.
+echo Production build kontrol ediliyor...
+if not exist ".next\BUILD_ID" (
+  echo Ilk kurulum: npm run build...
+  call npm run build
+  if errorlevel 1 (
+    echo [HATA] build basarisiz. Detay icin log'a bakin.
+    goto :end
+  )
+)
+
+echo.
 echo Sunucu basliyor: http://localhost:3000/Raporlar
 echo Bu pencere ACIK kalmali.
-echo Hata olursa asagida gorunecek.
 echo.
 echo ----------------------------------------
 echo.
 
-REM 10 sn sonra tarayiciyi ac
-start "" cmd /c "timeout /t 10 /nobreak >nul & start http://localhost:3000/Raporlar"
+start "" cmd /c "timeout /t 8 /nobreak >nul & start http://localhost:3000/Raporlar"
 
-call npm run dev > "%~dp0baslat-log.txt" 2>&1
+call npm run start > "%~dp0baslat-log.txt" 2>&1
 echo.
 echo ----------------------------------------
 echo Sunucu durdu. Cikis kodu: %ERRORLEVEL%

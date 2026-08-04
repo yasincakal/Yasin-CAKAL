@@ -1,13 +1,14 @@
 import { saveAs } from "file-saver";
 import type { ReportRow } from "./types";
-import { formatDateTR, formatMoney } from "./format";
+import { formatDateTR, formatMoney, isCountCol, isMoneyCol, isPercentCol } from "./format";
 
 function cellText(col: string, value: ReportRow[string]) {
   if (value == null || value === "") return "";
   if (typeof value === "number") {
-    const c = col.toLocaleLowerCase("tr-TR");
-    if (c.includes("%") || c.includes("oran")) return `${formatMoney(value)}%`;
-    return formatMoney(value);
+    if (isPercentCol(col)) return `${formatMoney(value)}%`;
+    if (isCountCol(col)) return formatMoney(value, Number.isInteger(value) ? 0 : 2);
+    if (isMoneyCol(col)) return formatMoney(value);
+    return formatMoney(value, Number.isInteger(value) ? 0 : 2);
   }
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
     return formatDateTR(value);
@@ -63,8 +64,8 @@ export async function exportPdf(
     head: [columns],
     body,
     styles: { fontSize: 7, cellPadding: 1.5 },
-    headStyles: { fillColor: [15, 107, 76] },
-    footStyles: { fillColor: [234, 244, 238], textColor: [19, 32, 25], fontStyle: "bold" },
+    headStyles: { fillColor: [14, 116, 144] },
+    footStyles: { fillColor: [226, 242, 247], textColor: [15, 23, 42], fontStyle: "bold" },
   });
 
   doc.save(`${safeFile(title)}.pdf`);

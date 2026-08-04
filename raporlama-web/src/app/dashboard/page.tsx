@@ -19,7 +19,7 @@ import { formatMoney } from "@/lib/format";
 import type { DashboardSummary } from "@/lib/types";
 
 export default function DashboardPage() {
-  const { session, refreshing } = useApp();
+  const { session, refreshTick } = useApp();
   const router = useRouter();
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState("");
@@ -45,7 +45,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [session, refreshing, session?.startDate, session?.endDate, router]);
+  }, [session, refreshTick, session?.startDate, session?.endDate, router]);
 
   return (
     <div className="page">
@@ -109,34 +109,34 @@ export default function DashboardPage() {
           <div className="chart-panel">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data?.isyeriKarlilik ?? []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#d7e3db" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#d5dde8" />
                 <XAxis dataKey="isYeri" hide />
                 <YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1_000_000)}M`} />
                 <Tooltip
                   formatter={(value) => formatMoney(Number(value ?? 0))}
-                  labelStyle={{ color: "#132019" }}
+                  labelStyle={{ color: "#1a2332" }}
                 />
-                <Bar dataKey="satis" name="Satış" fill="#0f6b4c" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="netKar" name="Net Kar" fill="#c9852c" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="satis" name="Satış" fill="#0e7490" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="netKar" name="Net Kar" fill="#ea580c" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Panel>
 
         <Panel title="Hızlı Raporlar">
-          <div style={{ padding: 16, display: "grid", gap: 10 }}>
+          <div className="quick-links">
             {[
               ["/raporlar/cari", "Cari Bakiyeler"],
-              ["/raporlar/karlilik", "A-1 Yönetim Karlılık"],
-              ["/raporlar/banka", "A-2 Banka Rapor"],
-              ["/raporlar/kredi", "A-3 Banka Kredi"],
-              ["/raporlar/fatura", "B-1 Fatura Karlılık"],
-              ["/raporlar/hizmet", "B-2 Hizmet Gideri"],
-              ["/raporlar/personel", "B-3 Personel Gideri"],
-              ["/raporlar/negatif", "C-2 Negatif Stok"],
+              ["/raporlar/karlilik", "Yönetim Karlılık"],
+              ["/raporlar/banka", "Banka Rapor"],
+              ["/raporlar/kredi", "Banka Kredi"],
+              ["/raporlar/fatura", "Fatura Karlılık"],
+              ["/raporlar/hizmet", "Hizmet Gideri"],
+              ["/raporlar/personel", "Personel Gideri"],
+              ["/raporlar/negatif", "Negatif Stok"],
             ].map(([href, label]) => (
-              <button key={href} className="firm-item" onClick={() => router.push(href)}>
-                <strong>{label}</strong>
+              <button key={href} className="quick-link" type="button" onClick={() => router.push(href)}>
+                {label}
               </button>
             ))}
           </div>

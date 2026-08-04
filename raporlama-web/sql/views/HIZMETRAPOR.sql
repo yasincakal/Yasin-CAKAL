@@ -67,7 +67,7 @@ WHEN 8 THEN 'Sabit Kıymet'
 WHEN 9 THEN 'Ek Malzeme' 
 WHEN 10 THEN 'Malzeme sınıfı'
 WHEN 11 THEN 'Fason' ELSE '' END AS [Satır Türü],
-ıtems.CODE as [Hizmet Kodu],
+ITEMS.CODE as [Hizmet Kodu],
 ITEMS.DEFINITION_ AS [Hizmet Adı],
 ITEMS.SPECODE  AS [Hizmet Özel Kod],
 ITEMS.SPECODE2 AS [Hizmet Özel Kod2],

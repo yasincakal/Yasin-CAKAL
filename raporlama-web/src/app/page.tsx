@@ -17,7 +17,9 @@ export default function HomePage() {
 
   return (
     <div className="boot-card">
-      <div className="brand-name">Raporlama</div>
+      <div className="brand-name" style={{ color: "var(--brand)" }}>
+        CariHesap Web
+      </div>
       <p>Yönlendiriliyor…</p>
     </div>
   );

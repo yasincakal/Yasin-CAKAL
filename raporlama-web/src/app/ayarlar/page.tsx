@@ -102,7 +102,7 @@ export default function AyarlarPage() {
 
   return (
     <div className="setup-card wide">
-      <div className="brand-sub">İlk açılış</div>
+      <div className="brand-sub">CariHesap Web</div>
       <h1>Veritabanı Bağlantısı</h1>
       <p className="lead">
         SQL Server bilgilerini bir kez kaydedin. Named instance için
@@ -213,7 +213,14 @@ veya sunucuyu şöyle yazın: DESKTOP-97B4PJQ,1433`}
         </button>
       </div>
       {configured && (
-        <p className="muted" style={{ marginTop: 16 }}>
+        <div className="actions" style={{ marginTop: 16 }}>
+          <button className="btn btn-secondary" type="button" onClick={() => router.push("/firma")}>
+            Firma / Dönem Seçimine Git
+          </button>
+        </div>
+      )}
+      {configured && (
+        <p className="muted" style={{ marginTop: 12 }}>
           Kayıtlı bağlantı mevcut. Firma seçimine gidebilirsiniz.
         </p>
       )}

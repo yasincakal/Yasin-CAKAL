@@ -79,7 +79,16 @@ Round(
      + ISNULL(odeme.[Ödeme BSMV],0)
      + ISNULL(odeme.[Ödeme KKDF],0))
 ,2),
-    [Kalan]          = CASE WHEN odeme.FROMCREDITCLOSE = 1 OR odeme.[Ödeme Anapara] IS NOT NULL THEN 'Kapandı' ELSE 'Yürürlükte' END
+    [Kalan]          = CASE
+      WHEN odeme.FROMCREDITCLOSE = 1 THEN 'Kapandı'
+      WHEN (
+        ISNULL(taksit.[Taksit Anapara],0) + ISNULL(taksit.[Taksit Faiz],0)
+        + ISNULL(taksit.[Taksit BSMV],0) + ISNULL(taksit.[Taksit KKDF],0)
+        - ISNULL(odeme.[Ödeme Anapara],0) - ISNULL(odeme.[Ödeme Faiz],0)
+        - ISNULL(odeme.[Ödeme BSMV],0) - ISNULL(odeme.[Ödeme KKDF],0)
+      ) <= 0 AND odeme.[Ödeme Anapara] IS NOT NULL THEN 'Kapandı'
+      ELSE 'Yürürlükte'
+    END
 from taksitler taksit
     /* Parantez içi ilk koşulun null olması durumda sonrakine bakacak */
 	left join odemeler odeme on odeme.KREDI_REF = taksit.KREDI_REF and (odeme.PARENTREF = taksit.TAKSIT_REF or odeme.PARENTREF = taksit.PARENTREF)

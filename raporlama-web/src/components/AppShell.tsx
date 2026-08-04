@@ -27,7 +27,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="boot-screen">
         <div className="boot-card">
-          <div className="brand-name">Raporlama</div>
+          <div className="brand-name" style={{ color: "var(--brand)" }}>
+            CariHesap Web
+          </div>
           <p>Bağlantı kontrol ediliyor…</p>
         </div>
       </div>

@@ -31,3 +31,53 @@ export function toSqlDate(iso: string) {
 export function clsx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
+
+const MONEY_HINTS = [
+  "tutar",
+  "bakiye",
+  "borç",
+  "alacak",
+  "maliyet",
+  "kar",
+  "satış",
+  "gider",
+  "anapara",
+  "faiz",
+  "toplam",
+  "net",
+  "bsmv",
+  "kkdf",
+];
+
+/** Para sütunu mu? "Borçlu Adet" gibi sayaçlar para sayılmaz. */
+export function isMoneyCol(col: string) {
+  const c = col.toLocaleLowerCase("tr-TR");
+  if (c.includes("adet") || c.includes("oran") || c.includes("%") || c.includes("no") || c.includes("kod")) {
+    return false;
+  }
+  // Tam eşleşme veya kelime içinde — ama "borçlu adet" zaten adet ile elendi
+  if (c === "borç" || c === "alacak" || c === "bakiye") return true;
+  return MONEY_HINTS.some((h) => {
+    if (h === "borç" || h === "alacak") {
+      // "Borçlu Adet" / "Alacaklı Adet" değil; "Borç", "Alacak", "Borç Tutarı" evet
+      return (
+        c === h ||
+        c.startsWith(`${h} `) ||
+        c.endsWith(` ${h}`) ||
+        c.includes(`${h} `) ||
+        c.includes(` ${h}`)
+      );
+    }
+    return c.includes(h);
+  });
+}
+
+export function isPercentCol(col: string) {
+  const c = col.toLocaleLowerCase("tr-TR");
+  return c.includes("%") || c.includes("oran");
+}
+
+export function isCountCol(col: string) {
+  const c = col.toLocaleLowerCase("tr-TR");
+  return c.includes("adet") || c.includes("sayı") || c.includes("sayi");
+}
