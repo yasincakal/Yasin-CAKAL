@@ -1,0 +1,83 @@
+IF OBJECT_ID(N'[dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_STOK_NEGATIF]', N'V') IS NOT NULL DROP VIEW [dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_STOK_NEGATIF];
+GO
+CREATE VIEW [dbo].[BAYRAK_{{FIRMA}}_{{DONEM}}_STOK_NEGATIF] AS  
+
+WITH   DETAYLAR  AS
+(
+
+
+SELECT 
+L.LOGICALREF,
+I.CODE AS [Stok Kodu],
+ı.NAME as [Stok Adı],
+ambar.NAME as [Ambar Adı],
+L.SOURCEINDEX AS [Ambar No],
+L.SOURCECOSTGRP as [Ambar Grup],
+CASE 
+WHEN L.TRCODE = 1 AND L.BILLED = 1    THEN 'Satınalma Faturası' 
+WHEN L.TRCODE = 1 AND L.BILLED = 0    THEN 'Satınalma İrsaliyesi' 
+WHEN L.TRCODE = 2 AND L.BILLED = 0    THEN 'Perakande Satış İade İrsaliyesi' 
+WHEN L.TRCODE = 2 AND L.BILLED = 1    THEN 'Perakande Satış İade Faturası' 
+WHEN L.TRCODE = 3 AND L.BILLED = 0    THEN 'Toptan Satış İade İrsaliyesi' 
+WHEN L.TRCODE = 3 AND L.BILLED = 1    THEN 'Toptan Satış İade Faturası' 
+WHEN L.TRCODE = 4 AND L.STFICHEREF>0  THEN 'Konsinye Çıkış İade İrsaliyesi' 
+WHEN L.TRCODE = 4 AND L.STFICHEREF=0  THEN 'Alınan Hizmet Faturası' 
+WHEN L.TRCODE = 5 AND L.STFICHEREF>0  THEN 'Konsinye Giriş İrsaliyesi'
+WHEN L.TRCODE = 5 AND L.STFICHEREF=0  THEN 'Alınan Proforma Faturası'
+WHEN L.TRCODE = 6 AND L.BILLED = 0    THEN 'Satınalma İade İrsaliyesi' 
+WHEN L.TRCODE = 6 AND L.BILLED = 1    THEN 'Satınalma İade Faturası' 
+WHEN L.TRCODE = 7 AND L.BILLED = 0    THEN 'Perakande Satış İrsaliyesi' 
+WHEN L.TRCODE = 7 AND L.BILLED = 1    THEN 'Perakande Satış Faturası' 
+WHEN L.TRCODE = 8 AND L.BILLED = 0    THEN 'Toptan Satış İrsaliyesi' 
+WHEN L.TRCODE = 8 AND L.BILLED = 1    THEN 'Toptan Satış Faturası' 
+WHEN L.TRCODE = 9 AND L.STFICHEREF>0  THEN 'Konsinye Çıkış İrsaliyesi' 
+WHEN L.TRCODE = 9 AND L.STFICHEREF=0  THEN 'Verilen Hizmet Faturası' 
+WHEN L.TRCODE= 10 AND L.STFICHEREF>0  THEN 'Konsinye Giriş İade İrsaliyesi' 
+WHEN L.TRCODE= 10 AND L.STFICHEREF=0  THEN 'Verilen Proforma Faturası' 
+WHEN L.TRCODE = 11                         THEN 'Fire Fişi' 
+WHEN L.TRCODE = 12                         THEN 'Sarf Fişi' 
+WHEN L.TRCODE = 13 AND L.STFICHEREF>0 THEN 'Üretimden Giriş Fişi'
+WHEN L.TRCODE = 13 AND L.STFICHEREF=0 THEN 'Alınan Fiyat Farkı Faturası'
+WHEN L.TRCODE = 14 AND L.STFICHEREF>0 THEN 'Devir Fişi' 
+WHEN L.TRCODE = 14 AND L.STFICHEREF=0 THEN 'Verilen Fiyat Farkı Faturası' 
+WHEN L.TRCODE = 25                         THEN 'Ambar Fişi' 
+WHEN L.TRCODE = 26                         THEN 'Muhtahsil İrsaliyesi' 
+WHEN L.TRCODE = 50                         THEN 'Sayım Fazlası Fişi' 
+WHEN L.TRCODE = 51                         THEN 'Sayım Eksiği Fişi' 
+ELSE '' END AS [Fiş Türü], 
+
+F.FICHENO as [Fiş No],
+INVOICE.FICHENO AS [Fatura No],
+ 
+L.DATE_ as [Tarih],
+L.AMOUNT * (CASE WHEN L.UINFO2 =0 THEN 1 ELSE L.UINFO2  END/ CASE WHEN L.UINFO1 =0 THEN 1 ELSE L.UINFO1  END)  AS [Ana Miktar],
+L.LINENET AS [Tutar], 
+SUM((L.AMOUNT * (CASE WHEN L.UINFO2 =0 THEN 1 ELSE L.UINFO2  END/ CASE WHEN L.UINFO1 =0 THEN 1 ELSE L.UINFO1  END) )* case when L.IOCODE  IN (1,2)  THEN 1  ELSE -1  END 
+)   OVER(PARTITION  BY  L.STOCKREF, L.SOURCECOSTGRP
+ ORDER BY L.STOCKREF, L.DATE_, L.FTIME, L.IOCODE, L.SOURCECOSTGRP, L.DESTCOSTGRP, L.STFICHEREF, L.STFICHELNNO
+) AS [Kalan Miktar],
+L.OUTCOST AS [Maliyet]
+ 
+FROM LG_{{FIRMA}}_ITEMS I  WITH(NOLOCK) LEFT JOIN  LG_{{FIRMA}}_{{DONEM}}_STLINE L  WITH(NOLOCK) ON I.LOGICALREF=L.STOCKREF
+LEFT JOIN  LG_{{FIRMA}}_{{DONEM}}_STFICHE F WITH(NOLOCK)  ON L.STFICHEREF = F.LOGICALREF
+LEFT JOIN  L_CAPIWHOUSE AMBAR ON AMBAR.NR = L.SOURCEINDEX  AND AMBAR.FIRMNR='{{FIRMA}}'
+LEFT JOIN  LG_{{FIRMA}}_{{DONEM}}_INVOICE  INVOICE ON INVOICE.LOGICALREF=L.INVOICEREF
+ WHERE  
+   
+  I.CARDTYPE IN (1,2,10,11,12)
+  AND L.LINETYPE IN (0,1,6,10)
+  AND L.DETLINE = 0
+  AND F.PRODSTAT = 0
+  AND L.CANCELLED = 0
+ )  
+
+
+select *  from (
+SELECT LOGICALREF,[Stok Kodu],[Stok Adı],[Ambar Adı],[Ambar No],[Ambar Grup],[Fiş Türü],[Fiş No],[Fatura No],Tarih,[Ana Miktar],Tutar,[Kalan Miktar],Maliyet,
+ case when [Kalan Miktar]<0 then -1 else 0   end [Negatif]
+FROM DETAYLAR  )  as tmp 
+ 
+
+
+GO
+GO

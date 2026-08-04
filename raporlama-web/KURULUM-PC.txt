@@ -1,0 +1,35 @@
+KURULUM - ÖNEMLİ (Windows)
+==========================
+
+HATA: package.json bulunamadı / localhost bağlanmayı reddetti
+NEDEN: ZIP'i ayıklamadan Temp klasöründen çalıştırıyorsun.
+
+DOĞRU ADIMLAR
+-------------
+1) İndirdiğin ZIP dosyasına SAĞ TIKLA
+2) "Tümünü ayıkla..." / "Extract All..." seç
+3) Hedef klasör örneği:
+     C:\Users\pc34\RaporlamaKurulum
+4) Açılan klasörde şunu bul:
+     Yasin-CAKAL-cursor-raporlama-web-e0d0\raporlama-web\
+5) "raporlama-web" klasörünün tamamını kopyala:
+     C:\Users\pc34\raporlama-web\
+
+Sonuçta şu dosyalar görünmeli:
+  C:\Users\pc34\raporlama-web\package.json
+  C:\Users\pc34\raporlama-web\KURULUM.bat
+  C:\Users\pc34\raporlama-web\BASLAT.bat
+
+6) C:\Users\pc34\raporlama-web\KURULUM.bat  (çift tık)
+7) C:\Users\pc34\raporlama-web\BASLAT.bat   (çift tık)
+
+Chrome:
+  http://localhost:3000/Raporlar
+
+AĞDAN (diğer PC'ler):
+  http://SENIN-IP:3000/Raporlar
+  (Windows Güvenlik Duvarı -> 3000 portuna izin)
+
+YANLIŞ:
+  ZIP'e çift tıklayıp Temp yolundan KURULUM.bat çalıştırmak
+  (...\AppData\Local\Temp\...zip...\KURULUM.bat)
