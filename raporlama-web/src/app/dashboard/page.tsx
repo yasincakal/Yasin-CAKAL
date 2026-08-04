@@ -54,7 +54,7 @@ export default function DashboardPage() {
         subtitle={
           session?.demoMode
             ? "Demo veri (statik)"
-            : `Canlı SQL · Firma ${session?.firmaNr}/${session?.donemNr}${session?.database ? ` · ${session.database}` : ""} · Cari bakiyeler bitiş tarihine kadar`
+            : `Canlı SQL · Firma ${session?.firmaNr}/${session?.donemNr}${session?.database ? ` · ${session.database}` : ""} · Cari bakiyeler seçilen bitiş tarihine kadar (tarih itibariyle)`
         }
       />
 
