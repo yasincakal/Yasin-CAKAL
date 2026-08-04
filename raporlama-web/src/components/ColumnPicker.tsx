@@ -3,49 +3,57 @@
 import { useEffect, useMemo, useState } from "react";
 import { Columns3 } from "lucide-react";
 
+function sameList(a: string[], b: string[]) {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
 export function useColumnVisibility(
   reportKey: string,
   allColumns: string[],
   defaultVisible?: string[]
 ) {
   const storageKey = `rapor-cols:${reportKey}`;
+  const columnsKey = JSON.stringify(allColumns);
+  const defaultKey = defaultVisible?.length ? JSON.stringify(defaultVisible) : "";
+
+  const stableColumns = useMemo(() => JSON.parse(columnsKey) as string[], [columnsKey]);
   const defaults = useMemo(() => {
-    if (defaultVisible?.length) return defaultVisible.filter((c) => allColumns.includes(c));
-    return allColumns;
-  }, [allColumns, defaultVisible]);
+    if (!defaultKey) return stableColumns;
+    const preferred = JSON.parse(defaultKey) as string[];
+    return preferred.filter((c) => stableColumns.includes(c));
+  }, [stableColumns, defaultKey]);
 
   const [visible, setVisible] = useState<string[]>(defaults);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    let next = defaults;
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw) as string[];
-        const filtered = parsed.filter((c) => allColumns.includes(c));
-        if (filtered.length) {
-          setVisible(filtered);
-          return;
-        }
+        const filtered = parsed.filter((c) => stableColumns.includes(c));
+        if (filtered.length) next = filtered;
       }
     } catch {
       /* ignore */
     }
-    setVisible(defaults);
-  }, [storageKey, allColumns, defaults]);
+    setVisible((prev) => (sameList(prev, next) ? prev : next));
+  }, [storageKey, defaults, stableColumns]);
 
   function toggle(col: string) {
     setVisible((prev) => {
       const next = prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col];
-      const ordered = allColumns.filter((c) => next.includes(c));
-      localStorage.setItem(storageKey, JSON.stringify(ordered));
-      return ordered.length ? ordered : defaults;
+      const ordered = stableColumns.filter((c) => next.includes(c));
+      const result = ordered.length ? ordered : defaults;
+      localStorage.setItem(storageKey, JSON.stringify(result));
+      return result;
     });
   }
 
   function showAll() {
-    setVisible(allColumns);
-    localStorage.setItem(storageKey, JSON.stringify(allColumns));
+    setVisible(stableColumns);
+    localStorage.setItem(storageKey, JSON.stringify(stableColumns));
   }
 
   function reset() {
