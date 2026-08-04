@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   PackageX,
   PieChart,
+  Receipt,
   Settings,
   Landmark,
   Users,
@@ -30,10 +31,41 @@ const reports = [
   { href: "/raporlar/negatif", label: "Negatif Stok", icon: PackageX },
 ];
 
+const maliTablolar = [
+  { href: "/raporlar/kdv", label: "KDV Raporu", icon: Receipt },
+];
+
 const settings = [
   { href: "/firma", label: "Firma / Dönem", icon: Building2 },
   { href: "/ayarlar", label: "Bağlantı Ayarları", icon: Settings },
 ];
+
+function NavLinks({
+  items,
+  pathname,
+}: {
+  items: typeof reports;
+  pathname: string;
+}) {
+  return (
+    <>
+      {items.map((item) => {
+        const Icon = item.icon;
+        const active = pathname === item.href || pathname.startsWith(item.href + "/");
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={clsx("nav-item", active && "active")}
+          >
+            <Icon size={18} strokeWidth={1.75} />
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+    </>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -62,35 +94,11 @@ export function Sidebar() {
 
       <nav className="nav-list">
         <div className="nav-section">Raporlar</div>
-        {reports.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={clsx("nav-item", active && "active")}
-            >
-              <Icon size={18} strokeWidth={1.75} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+        <NavLinks items={reports} pathname={pathname} />
+        <div className="nav-section">Mali Tablolar</div>
+        <NavLinks items={maliTablolar} pathname={pathname} />
         <div className="nav-section">Sistem</div>
-        {settings.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={clsx("nav-item", active && "active")}
-            >
-              <Icon size={18} strokeWidth={1.75} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+        <NavLinks items={settings} pathname={pathname} />
       </nav>
     </aside>
   );
