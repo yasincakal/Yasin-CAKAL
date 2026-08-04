@@ -8,6 +8,8 @@ import {
   demoFatura,
   demoHizmet,
   demoKarlilik,
+  demoKdv,
+  demoKdvOzet,
   demoKrediDetay,
   demoKrediOzet,
   demoNegatif,
@@ -347,6 +349,76 @@ ORDER BY [Tarih],[Fiş No]`);
   return toReport(rows, "sql");
 }
 
+export async function getKdvReport(): Promise<ReportResponse> {
+  const s = sessionOrThrow();
+  if (!assertLive(s)) return demoKdv();
+  await ensureLiveViews();
+  const rows = await liveQuery(`
+SELECT * FROM [dbo].[${v("KDVRAPOR")}]
+WHERE ${dateFilter("Tarih")}
+ORDER BY [Tarih],[Fiş No],[Hesap Kodu]`);
+  const totals: ReportRow = {
+    "KDV Türü": "TOPLAM",
+    Tarih: null,
+    Yıl: null,
+    Ay: null,
+    "Fiş Türü": null,
+    "Fiş No": null,
+    "Yevmiye No": null,
+    "Genel Açıklama": null,
+    "Hesap Kodu": null,
+    "Hesap Adı": null,
+    Borç: rows.reduce((a, r) => a + Number(r.Borç ?? 0), 0),
+    Alacak: rows.reduce((a, r) => a + Number(r.Alacak ?? 0), 0),
+    "Borç / Alacak": rows.reduce((a, r) => a + Number(r["Borç / Alacak"] ?? 0), 0),
+    "Modül Adı": null,
+    "İş Yeri No": null,
+    "İş Yeri": null,
+  };
+  return {
+    ...toReport(rows, "sql"),
+    totals,
+    defaultVisible: [
+      "KDV Türü",
+      "Tarih",
+      "Ay",
+      "Fiş No",
+      "Hesap Kodu",
+      "Hesap Adı",
+      "Borç",
+      "Alacak",
+      "Borç / Alacak",
+    ],
+  };
+}
+
+export async function getKdvOzetReport(): Promise<ReportResponse> {
+  const s = sessionOrThrow();
+  if (!assertLive(s)) return demoKdvOzet();
+  await ensureLiveViews();
+  const rows = await liveQuery(`
+SELECT
+  [KDV Türü],
+  [Hesap Kodu],
+  [Hesap Adı],
+  SUM([Borç]) AS [Borç],
+  SUM([Alacak]) AS [Alacak],
+  SUM([Borç / Alacak]) AS [Borç / Alacak]
+FROM [dbo].[${v("KDVRAPOR")}]
+WHERE ${dateFilter("Tarih")}
+GROUP BY [KDV Türü], [Hesap Kodu], [Hesap Adı]
+ORDER BY [KDV Türü], [Hesap Kodu]`);
+  const totals: ReportRow = {
+    "KDV Türü": "TOPLAM",
+    "Hesap Kodu": "",
+    "Hesap Adı": "",
+    Borç: rows.reduce((a, r) => a + Number(r.Borç ?? 0), 0),
+    Alacak: rows.reduce((a, r) => a + Number(r.Alacak ?? 0), 0),
+    "Borç / Alacak": rows.reduce((a, r) => a + Number(r["Borç / Alacak"] ?? 0), 0),
+  };
+  return { ...toReport(rows, "sql"), totals };
+}
+
 export async function getNegatifReport(filters?: {
   stokKod?: string;
   stokAd?: string;
@@ -572,6 +644,8 @@ export async function refreshAllReports() {
     getFaturaReport(),
     getHizmetReport(),
     getPersonelReport(),
+    getKdvReport(),
+    getKdvOzetReport(),
     getNegatifReport(),
     getCariBakiyeOzet(),
     getCariBakiyeListe("all"),

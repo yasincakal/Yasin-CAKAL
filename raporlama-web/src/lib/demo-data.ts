@@ -357,6 +357,122 @@ export function demoPersonel(): ReportResponse {
   return { columns: Object.keys(rows[0]), rows, source: "demo" };
 }
 
+export function demoKdv(): ReportResponse {
+  const rows = [
+    {
+      "KDV Türü": "İndirilecek KDV",
+      Tarih: "2026-03-15",
+      Yıl: 2026,
+      Ay: "03-Mart",
+      "Fiş Türü": "Mahsup Fişi",
+      "Fiş No": "MH000123",
+      "Yevmiye No": "4501",
+      "Genel Açıklama": "Alış faturası KDV",
+      "Hesap Kodu": "191.01.001",
+      "Hesap Adı": "İNDİRİLECEK KDV %20",
+      Borç: 45000,
+      Alacak: 0,
+      "Borç / Alacak": 45000,
+      "Modül Adı": "Satınalma",
+      "İş Yeri No": 0,
+      "İş Yeri": "LİMAN ENZA",
+    },
+    {
+      "KDV Türü": "İndirilecek KDV",
+      Tarih: "2026-03-18",
+      Yıl: 2026,
+      Ay: "03-Mart",
+      "Fiş Türü": "Mahsup Fişi",
+      "Fiş No": "MH000145",
+      "Yevmiye No": "4520",
+      "Genel Açıklama": "Hizmet alış KDV",
+      "Hesap Kodu": "191.01.002",
+      "Hesap Adı": "İNDİRİLECEK KDV %10",
+      Borç: 12500,
+      Alacak: 0,
+      "Borç / Alacak": 12500,
+      "Modül Adı": "Satınalma",
+      "İş Yeri No": 1,
+      "İş Yeri": "KUMLUCA ENZA",
+    },
+    {
+      "KDV Türü": "Hesaplanan KDV",
+      Tarih: "2026-03-20",
+      Yıl: 2026,
+      Ay: "03-Mart",
+      "Fiş Türü": "Mahsup Fişi",
+      "Fiş No": "MH000210",
+      "Yevmiye No": "4602",
+      "Genel Açıklama": "Satış faturası KDV",
+      "Hesap Kodu": "391.01.001",
+      "Hesap Adı": "HESAPLANAN KDV %20",
+      Borç: 0,
+      Alacak: 82000,
+      "Borç / Alacak": -82000,
+      "Modül Adı": "Satış ve Dağıtım",
+      "İş Yeri No": 0,
+      "İş Yeri": "LİMAN ENZA",
+    },
+    {
+      "KDV Türü": "Hesaplanan KDV",
+      Tarih: "2026-03-22",
+      Yıl: 2026,
+      Ay: "03-Mart",
+      "Fiş Türü": "Mahsup Fişi",
+      "Fiş No": "MH000228",
+      "Yevmiye No": "4615",
+      "Genel Açıklama": "Perakende satış KDV",
+      "Hesap Kodu": "391.01.001",
+      "Hesap Adı": "HESAPLANAN KDV %20",
+      Borç: 0,
+      Alacak: 15600,
+      "Borç / Alacak": -15600,
+      "Modül Adı": "Satış ve Dağıtım",
+      "İş Yeri No": 5,
+      "İş Yeri": "GAZİ BULVARI ENZA",
+    },
+  ];
+  return { columns: Object.keys(rows[0]), rows, source: "demo" };
+}
+
+export function demoKdvOzet(): ReportResponse {
+  const rows = [
+    {
+      "KDV Türü": "İndirilecek KDV",
+      "Hesap Kodu": "191.01.001",
+      "Hesap Adı": "İNDİRİLECEK KDV %20",
+      Borç: 45000,
+      Alacak: 0,
+      "Borç / Alacak": 45000,
+    },
+    {
+      "KDV Türü": "İndirilecek KDV",
+      "Hesap Kodu": "191.01.002",
+      "Hesap Adı": "İNDİRİLECEK KDV %10",
+      Borç: 12500,
+      Alacak: 0,
+      "Borç / Alacak": 12500,
+    },
+    {
+      "KDV Türü": "Hesaplanan KDV",
+      "Hesap Kodu": "391.01.001",
+      "Hesap Adı": "HESAPLANAN KDV %20",
+      Borç: 0,
+      Alacak: 97600,
+      "Borç / Alacak": -97600,
+    },
+  ];
+  const totals = {
+    "KDV Türü": "TOPLAM",
+    "Hesap Kodu": "",
+    "Hesap Adı": "",
+    Borç: 57500,
+    Alacak: 97600,
+    "Borç / Alacak": -40100,
+  };
+  return { columns: Object.keys(rows[0]), rows, totals, source: "demo" };
+}
+
 export function demoNegatif(): ReportResponse {
   const rows = [
     {

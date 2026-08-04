@@ -9,6 +9,8 @@ import {
   getFaturaReport,
   getHizmetReport,
   getKarlilikReport,
+  getKdvOzetReport,
+  getKdvReport,
   getKrediDetayReport,
   getKrediOzetReport,
   getNegatifReport,
@@ -28,6 +30,8 @@ const handlers: Record<string, (sp: URLSearchParams) => Promise<unknown>> = {
   fatura: async (sp) => getFaturaReport(sp.get("stokKod") ?? "%"),
   hizmet: async () => getHizmetReport(),
   personel: async () => getPersonelReport(),
+  kdv: async () => getKdvReport(),
+  "kdv-ozet": async () => getKdvOzetReport(),
   negatif: async (sp) =>
     getNegatifReport({
       stokKod: sp.get("stokKod") ?? "",

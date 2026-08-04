@@ -12,6 +12,7 @@ export const REQUIRED_VIEWS = [
   "KREDIRAPOR",
   "STOK_NEGATIF",
   "CARIBAKIYELER",
+  "KDVRAPOR",
 ] as const;
 
 export type RequiredView = (typeof REQUIRED_VIEWS)[number];

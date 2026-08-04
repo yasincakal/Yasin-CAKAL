@@ -23,5 +23,6 @@ Windows Güvenlik Duvarı’nda **3000** portuna izin verin.
 - Tüm raporlarda **Sütunlar** (gizli alanları aç/kapat)
 - **PDF / Excel** kaydet
 - Negatif stok ayrı menüde
+- **Mali Tablolar** altında KDV Raporu (191 indirilecek / 391 hesaplanan)
 
 Ayar dosyası: `C:\ProgramData\RaporlamaWeb\`
